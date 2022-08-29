@@ -1,53 +1,50 @@
-#---------------------------------------------------------------------------------
-.SUFFIXES:
-#---------------------------------------------------------------------------------
 ifeq ($(strip $(DEVKITARM)),)
 $(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM)
 endif
 
 include $(DEVKITARM)/ds_rules
 
-export TARGET		:=	reset
-#$(shell basename $(CURDIR))
+export TARGET		:=	nds.r4loader
 export TOPDIR		:=	$(CURDIR)
-
-
-#---------------------------------------------------------------------------------
-# path to tools - this can be deleted if you set the path in windows
-#---------------------------------------------------------------------------------
 export PATH		:=	$(DEVKITARM)/bin:$(PATH)
 
-.PHONY: $(TARGET).arm9
+all: ../$(TARGET).nds
+.PHONY: clean
 
-#---------------------------------------------------------------------------------
-# main targets
-#---------------------------------------------------------------------------------
-all: $(TARGET).mse
+clean:
+	rm -f $(TARGET).arm9 main.o .map linkmaker
 
-#$(TARGET).ds.gba	: $(TARGET).nds
-
-#---------------------------------------------------------------------------------
-$(TARGET).mse	:	$(TARGET).arm9 linkmaker
-	ndstool	-c $(TARGET).mse -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -r9 0x02000450 -b $(TARGET).bmp "r4loader extlink"
-	linkmaker	$(TARGET).mse
-	cp		$(TARGET).mse R4TF.mse
-	dldipatch	r4tf_v2.dldi R4TF.mse
-	mselink	R4TF.mse /__rpg/r4loader.nds nds.r4loader.nds
-	cp		nds.r4loader.nds ../
+### final build script ###
+../$(TARGET).nds	:	$(TARGET).arm9 linkmaker
+	ndstool	-c reset.mse -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -r9 0x02000000 -b $(TARGET).bmp "r4loader extlink"
+	linkmaker	reset.mse
+	dldipatch	r4tf.dldi reset.mse
+	mselink	reset.mse /__rpg/r4loader.nds $(TARGET).nds
+	rm		reset.mse
+	mv -f		$(TARGET).nds ../
 
 linkmaker:	linkmaker.c
 	gcc -o linkmaker -O2 linkmaker.c
 
-#---------------------------------------------------------------------------------
-$(TARGET).arm9	: arm9/$(TARGET).elf
+### compile main.c ###
+LIBDIRS	:=	$(LIBNDS)
+export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
+			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
+			-I$(CURDIR)
+export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
+LIBS	:= ../../libprism/libprism.a -lfat -lnds9
+ARCH	:=	-mthumb -mthumb-interwork
+CFLAGS	:=	-Wall -O2 \
+			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
+			-ffast-math -fdata-sections \
+			$(ARCH) -DARM9
+LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -mno-fpu -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
+LDFLAGS	+=	-Wl,--section-start,.init=0x02000000
 
-#---------------------------------------------------------------------------------
-	
-#---------------------------------------------------------------------------------
-arm9/$(TARGET).elf:
-	$(MAKE) -C arm9
-
-#---------------------------------------------------------------------------------
-clean:
-	$(MAKE) -C arm9 clean
-	rm -f $(TARGET).ds.gba $(TARGET).mse $(TARGET).arm9 linkmaker R4TF.mse r4loader.nds nds.r4loader.nds
+$(TARGET).arm9: main.c
+	@echo Compiling...
+	@$(CC) $(CFLAGS) $(INCLUDE) -c -o main.o main.c
+	@echo Linking...
+	@$(CC) $(LDFLAGS) -o $(TARGET).arm9.elf main.o $(LIBPATHS) $(LIBS)
+	@$(OBJCOPY) -O binary $(TARGET).arm9.elf $(TARGET).arm9
+	@rm $(TARGET).arm9.elf

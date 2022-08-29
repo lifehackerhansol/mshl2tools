@@ -12,13 +12,20 @@
 #endif
 
 int link(unsigned char *p, const int offset, const int size, const char *target, const char *link){
+	unsigned banneroffset;
 	FILE *f=fopen(target+1,"rb");
-	unsigned char head[0x200],buf[2112],z[256*3];
+	unsigned char head[0x200],z[256*3];
 	if(!f)return -1;
 
 	fread(head,1,0x160,f);
-	fseek(f,(head[0x06b]<<24)+(head[0x06a]<<16)+(head[0x069]<<8)+head[0x068],SEEK_SET);
-	fread(buf,1,2112,f);
+	banneroffset=(head[0x06b]<<24)+(head[0x06a]<<16)+(head[0x069]<<8)+head[0x068];
+	if(banneroffset){
+		unsigned char *banner=p+((p[0x06b]<<24)+(p[0x06a]<<16)+(p[0x069]<<8)+p[0x068]);
+		fseek(f,banneroffset,SEEK_SET);
+		fread(banner,1,2112,f);
+		if(banner[0]!=1)banner[0]=1; //for moonshell2
+		if(banner[1]!=0)banner[1]=0; //for moonshell2
+	}
 	fclose(f);
 
 	f=fopen(link,"wb");
@@ -33,7 +40,6 @@ int link(unsigned char *p, const int offset, const int size, const char *target,
 #else
 	strcpy(p+offset,target);
 #endif
-	memcpy(p+((p[0x06b]<<24)+(p[0x06a]<<16)+(p[0x069]<<8)+p[0x068]),buf,2112);
 	fwrite(p,1,size,f);
 	fclose(f);
 	return 0;
@@ -68,8 +74,8 @@ int makedir(const char* dir){
 
 int recursive(
 	unsigned char *p, const int offset, const int size,
-	const char *targetd, const char *targetf,
-	const char *linkd, const char *linkf){
+	char *targetd, char *targetf,
+	char *linkd, char *linkf){
 	DIR *d=opendir(targetd+1);
 	struct dirent *ent;
 	if(!d)return 1;
