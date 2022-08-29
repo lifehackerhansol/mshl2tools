@@ -16,9 +16,9 @@ clean:
 
 ### final build script ###
 ../$(TARGET).mse	:	$(TARGET).arm9 linkmaker r4isdhc
-	r4isdhc	$(TARGET).arm9 $(TARGET).r4isdhc.arm9
+	./r4isdhc	$(TARGET).arm9 $(TARGET).r4isdhc.arm9
 	ndstool	-c $(TARGET).mse -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -e9 0x02000450 -b $(TARGET).bmp "reset_mse_06b dldi;Very fast reset/loader"
-	linkmaker	$(TARGET).mse
+	./linkmaker	$(TARGET).mse
 	mselink	$(TARGET).mse /ez5sys.bin EZ5H.nds
 	dldipatch	../../xenofile/source/dldi/ez5h.dldi EZ5H.nds
 	mselink	$(TARGET).mse /ez5isys.bin EZ5i.nds
@@ -37,11 +37,11 @@ clean:
 	mselink	$(TARGET).mse /akmenu4.nds XXXX.nds
 	dldipatch	../../xenofile/source/dldi/xxxx.dldi XXXX.nds
 	ndstool	-c DEMO.mse -7 ../../arm7/arm7.bin -9 $(TARGET).r4isdhc.arm9 -e9 0x02000000 -b $(TARGET).bmp "reset_mse_06b dldi;Very fast reset/loader"
-	linkmaker	DEMO.mse
+	./linkmaker	DEMO.mse
 	mselink	DEMO.mse /r4.dat DEMO.nds
 	dldipatch	../../xenofile/source/dldi/demo.dldi DEMO.nds
 	ndstool	-c SCDS.mse -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -e9 0x02000450 -b $(TARGET).bmp "reset_mse_06b dldi;Very fast reset/loader" -g ENG0 00 MSFORSC
-	linkmaker	SCDS.mse
+	./linkmaker	SCDS.mse
 	mselink	SCDS.mse /msforsc.nds SCDS.nds
 	dldipatch	../../xenofile/source/dldi/scds.dldi SCDS.nds
 	mselink	SCDS.mse /_dstwo/dstwo.nds DSI2.nds
@@ -49,7 +49,7 @@ clean:
 	mselink	SCDS.mse /_ismart/ismart.nds DSI2_ismart.nds
 	dldipatch	../../xenofile/source/dldi/dsi2.dldi DSI2_ismart.nds
 	ndstool	-c moonshl2alt.mse -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -e9 0x02000450 -b moonshl2alt.bmp "MoonShell2;Alternative Loader"
-	linkmaker	moonshl2alt.mse
+	./linkmaker	moonshl2alt.mse
 	mselink	moonshl2alt.mse /moonshl2/reload.dat moonshl2alt.nds
 	rm		DEMO.mse SCDS.mse moonshl2alt.mse $(TARGET).r4isdhc.arm9
 	mv -f		$(TARGET).mse EZ5H.nds EZ5i.nds IMAT.nds Mati.nds TTIO.nds R4DS.nds RPGS.nds RPGN.nds XXXX.nds DEMO.nds SCDS.nds DSI2.nds DSI2_ismart.nds moonshl2alt.nds ../
@@ -77,7 +77,7 @@ CFLAGS	:=	-Wall -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
 			-ffast-math -fdata-sections \
 			$(ARCH) -DARM9
-LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -mno-fpu -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
+LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
 LDFLAGS	+=	-Wl,--section-start,.init=0x02000450
 
 $(TARGET).arm9: main.c

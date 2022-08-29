@@ -1,4 +1,3 @@
-#define DSI_SD
 #ifdef DSI_SD
 
 #include <nds.h>
@@ -330,4 +329,3 @@ bool sdmmc_sd_readsectors(u32 sector_no, u32 numsectors, void *out) {
 }
 
 #endif
-

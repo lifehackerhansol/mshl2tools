@@ -23,7 +23,7 @@ linkmaker: linkmaker.c
 #---------------------------------------------------------------------------------
 $(TARGET).nds	:	$(TARGET).arm7 $(TARGET).arm9 linkmaker
 	ndstool	-c $(TARGET).nds -7 $(TARGET).arm7 -9 $(TARGET).arm9 -b $(TARGET).bmp "MoonShell2 Link;Template based on;reset_mse_06b_for_ak2"
-	linkmaker $(TARGET).nds
+	./linkmaker $(TARGET).nds
 	cp	$(TARGET).nds ../
 
 #---------------------------------------------------------------------------------

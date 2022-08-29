@@ -299,7 +299,6 @@ bool sdmmc_sd_readsectors(u32 sector_no, u32 numsectors, void *out);
 #define myPM_LED_SLEEP (1<<4)
 #define myPM_LED_BLINK (3<<4)
 
-#define DSI_SD
 int main(){
 	if(dsiSD){
 #ifdef DSI_SD

@@ -17,7 +17,7 @@ clean:
 ### final build script ###
 ../$(TARGET).nds	:	$(TARGET).arm9 linkmaker
 	ndstool	-c $(TARGET).mse -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -e9 0x02000450 -b $(TARGET).bmp "reset_mse_06b dldi;Very fast reset/loader;for DSBooter"
-	linkmaker	$(TARGET).mse
+	./linkmaker	$(TARGET).mse
 	mselink	$(TARGET).mse /system/g6dsload.eng $(TARGET).nds
 	dldipatch	../../xenofile/source/dldi/m3ds.dldi $(TARGET).nds
 	mselink	$(TARGET).mse /system/g003rest.dat G003.nds
@@ -43,7 +43,7 @@ CFLAGS	:=	-Wall -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
 			-ffast-math -fdata-sections \
 			$(ARCH) -DARM9
-LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -mno-fpu -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
+LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
 LDFLAGS	+=	-Wl,--section-start,.init=0x02000450
 
 $(TARGET).arm9: main.c

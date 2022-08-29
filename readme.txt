@@ -659,10 +659,10 @@ Now inilink Cyclo requires holding buttons specified in config.xml.
 XenoFile: added bootlib+bootstub loader. You must update bootstub.bin too; otherwise target's exit will restart target ^^
 XenoFile: added Return to bootstub.
 
-0.75.110203 Interrude
+0.75.110203 Phase:Interrude
 Version bumped to stable. Prelude for mshl2tools 1.x.
 
-0.75a.110203 Interrude
+0.75a.110203 Phase:Interrude
 Fixed a bug that Slot2 wasn't bootable in 0.75.
 Updated to libnds 1.4.10/libfat 1.0.9(modified).
 Added "fix FSInfo Sector" to re-calculate the number of free clusters again.
@@ -670,18 +670,18 @@ Tuned MoonShell Simply loader up for 1.x.
 You can now patch with NULL DLDI to force DSi SD.
 DSi Volume Buttons no longer interrupt execution.
 
-0.75b.110204 Interrude
+0.75b.110204 Phase:Interrude
 Changed killing interrupts timing for 1.x.
 Killed sd:/, as it seems to stuck if not booted from DSiWare.
 
-0.75c.110205 Interrude
+0.75c.110205 Phase:Interrude
 Slight optimization for 1.x.
 Now libfat grubs LFN automatically for 8.3 files and it can handle 0xe5 filename. Yay!
 Updated bootlib loader.
 Now sd:/ is again available. Instead searching drivers will stop if fat:/ is OK.
 Press L+R+START+SELECT to exit the program.
 
-0.75d.110206 Interrude
+0.75d.110206 Phase:Interrude
 Now bootlib uses thumb instead of arm.
 
 0.76.110209 with elm
@@ -829,26 +829,26 @@ mshl2tools treats all paths using driver letters.
 0.86.110830
 Now moonshell simply loader patches NDS header to use 0x02ff... for DSi mode.
 
-0.86a.110912 Schlaf
+0.86a.110912 Phase:Schlaf
 Updated nesdswrap.
 
-0.87.110917 Schlaf
+0.87.110917 Phase:Schlaf
 Fixed nesdswrap.
 Added reset_ievo (compatible with DSi mode).
 Fixed a fatal bug in _FAT_directory_lfnLength() (thanks to desmume's lovely bug).
 
-0.87a.111005 Schlaf
+0.87a.111005 Phase:Schlaf
 Updated nesdswrap.
 Fixed 95% warnings.
 
-0.88.111116 Schlaf
+0.88.111116 Phase:Schlaf
 Updated nesdswrap.
 Fixed "Change DLDI" feature (forgot to clear cache :p).
 
-0.88a.111121 Schlaf
+0.88a.111121 Phase:Schlaf
 Added wdayloader.
 
-0.88b.111124 Schlaf
+0.88b.111124 Phase:Schlaf
 extlink.dat path is now modifiable.
 internal archive has fishell2/extlink/nds.mshl2wrap.nds.
 ARM7 bios isn't dumped if not required.
@@ -862,7 +862,7 @@ Fixed XenoFile's CRC16 calculation. (Now it shows the same value as LHA)
 Fixed XenoFile's very rare case bug: if selected music file can't be opened, xenofile freezes.
 
 0.88e.111216 (Internal)
-Added gbadump.
+Added gbadump (untested at all).
 
 0.89.120113 Phase:Rebirth
 Hopefully XenoFile's warning are resolved using typeof casting (lol).
@@ -884,3 +884,44 @@ Fixed libelm's obtaining SFN.
 nesdswrap hotfix.
 detects extmem size more precisely.
 XenoFile can now call /__rpg/associations.ini (libfat only).
+
+0.90a.120412 Phase:Rebirth
+Rebuilt using devkitARMr38 + libnds 1.5.5.
+Revised bootlib/bootloader/boot.bin.
+
+0.90a1.120421 Phase:Neige
+Updated nesdswrap.
+Fixed that XenoFile tried to sort dir even if files are more than 4096.
+Rebuilt against libnds 1.5.6.
+
+0.90b.120510 Phase:Neige
+Updated nesdswrap.
+Rebuilt using devkitARMr40 + libnds 1.5.7.
+inilink will load boot.ievo directly if DLDI_ID is CEVO && DLDI_Name has iEvolution.
+
+0.91.120529 Phase:Neige
+Finally fixed sound driver issue. Now music is played properly.
+Eliminated DC_FlushAll() from sound driver.
+Updated nesdswrap.
+
+0.91a.120613 Phase:Neige
+Updated nesdswrap.
+Fixed XenoFile sound driver's EOF detection
+(last a few seconds weren't played in previous version).
+Now it costs half ARM7 power when playing monoral music.
+
+0.91b.120720 Phase:Neige
+Rebuilt using devkitARMr41.
+Fixed ex4tf.dldi.
+
+0.91c.130413 Phase:Neige
+Updated nesdswrap.
+Added frontend2assoc.
+For IPC edition, time() is working on 3DS and DeSmuME.
+
+0.91d.140203 Phase:Neige
+Integrated dldicaptor and gbadump into XenoFile.
+Added unbrickgwinstaller.
+
+0.91d1.140204 Phase:Neige
+Fixed minor stuff.
