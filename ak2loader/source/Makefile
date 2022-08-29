@@ -19,7 +19,7 @@ clean:
 	ndstool	-c reset.mse -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -r9 0x02000000 -b $(TARGET).bmp "ak2loader extlink"
 	linkmaker	reset.mse
 	dldipatch	rpgs.dldi reset.mse
-	mselink	reset.mse /akloader.nds $(TARGET).nds
+	mselink	reset.mse /YSMenu/ak2loader.nds $(TARGET).nds
 	rm		reset.mse
 	mv -f		$(TARGET).nds ../
 
@@ -32,7 +32,7 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 			-I$(CURDIR)
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
-LIBS	:= ../../libprism/libprism.a -lfat -lnds9
+LIBS	:= ../../libprism/libprism.a -lnds9
 ARCH	:=	-mthumb -mthumb-interwork
 CFLAGS	:=	-Wall -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \

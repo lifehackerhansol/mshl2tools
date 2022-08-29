@@ -31,7 +31,7 @@ CFLAGS	:=	-Wall -O2 \
 			-ffast-math -fdata-sections \
 			$(ARCH)
 
-CFLAGS	+=	$(INCLUDE) -DARM9 -DGPL
+CFLAGS	+=	$(INCLUDE) -DARM9
 CXXFLAGS	:=	$(CFLAGS)
 
 ASFLAGS	:=	-g $(ARCH)
@@ -42,7 +42,7 @@ LDFLAGS	+=	-Wl,--section-start,.init=0x02000450
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
 ### relative path from source/arm9/build
-LIBS	:= ../../../../libprism/libprism.a ../source/zlib/libz.a ../source/libcarddump.a -lfat -lnds9 -lm
+LIBS	:= ../../../../libprism/libprism.a ../source/zlib/libz.a ../source/libcarddump.a -lnds9 -lm
  
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing

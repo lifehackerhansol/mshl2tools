@@ -4,7 +4,7 @@
 #include "msp.h"
 
 #define EXTMAX 256
-extern char ext[32][EXTMAX];
+extern char ext[EXTMAX][32];
 
 // 1/3sec
 #define KEYCOUNTMAX_UNREPEATED 20
@@ -83,9 +83,3 @@ int icodecode_show(char *name);
 int iterateMSP(int start);
 TPluginBody* getPluginByIndex(int idx);
 
-//encryption
-void EncryptSecureArea(char *ndsfilename);
-void DecryptSecureArea(char *ndsfilename);
-
-//firmware
-int returnDSMenu();

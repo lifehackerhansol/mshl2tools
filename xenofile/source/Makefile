@@ -48,7 +48,7 @@ a9_02000000:	a9_02000000.c
 	dldipatch	dldi/xxxx.dldi akmenu4_acek.nds
 	cp		$(TARGET).nds m3ds.nds
 	dldipatch	dldi/m3ds.dldi m3ds.nds
-	dsbize		m3ds.nds ../g6dsload.eng 0x12
+	dsbize		m3ds.nds ../menu.xx 0x12
 	cp		$(TARGET).nds g003.nds
 	dldipatch	dldi/g003.dldi g003.nds
 	dsbize		g003.nds ../g003rest.dat 0x23

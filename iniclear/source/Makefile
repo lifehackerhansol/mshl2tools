@@ -37,7 +37,7 @@ r4isdhc:	r4isdhc.c
 	dldipatch	../../xenofile/source/dldi/xxxx.dldi akmenu4_acek.nds
 	cp		$(TARGET).nds m3ds.nds
 	dldipatch	../../xenofile/source/dldi/m3ds.dldi m3ds.nds
-	dsbize		m3ds.nds ../g6dsload.eng 0x12
+	dsbize		m3ds.nds ../menu.xx 0x12
 	cp		$(TARGET).nds g003.nds
 	dldipatch	../../xenofile/source/dldi/g003.dldi g003.nds
 	dsbize		g003.nds ../g003rest.dat 0x23
@@ -60,7 +60,7 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 			-I$(CURDIR)
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
-LIBS	:= ../../libprism/libprism.a -lfat -lnds9
+LIBS	:= ../../libprism/libprism.a -lnds9
 ARCH	:=	-mthumb -mthumb-interwork
 CFLAGS	:=	-Wall -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \

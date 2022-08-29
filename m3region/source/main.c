@@ -5,8 +5,6 @@ void Main(){
 	char dldiid[5];
 	unsigned char *dldiFileData=DLDIDATA;
 
-	IPCZ->cmd=0;
-
 	_consolePrintf(
 		"m3 region check\n"
 		//"reset_mse_06b_for_ak2 by Moonlight, Rudolph, kzat3\n"
@@ -23,7 +21,7 @@ void Main(){
 		(type>>7)&1,(type>>6)&1,(type>>5)&1,(type>>4)&1,(type>>3)&1,(type>>2)&1,(type>>1)&1,(type>>0)&1);
 	_consolePrint("\n");
 
-	_consolePrintf2(
+	_consolePrint2(
 		"Jumper:  flag1 jumper flag2\n"
 		"[R4/M3S] 1 1 1        1 0 0\n"
 		"[M3Real] 0 1 1        1 0 0\n"
@@ -60,9 +58,9 @@ void Main(){
 		_consolePrintf("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
 	}
 
-	_consolePrintf("Initializing libfat (to exit)... ");
-	if(!fatInitDefault()){_consolePrintf("Failed.\n");die();}
-	_consolePrintf("Done.\n");
+	_consolePrint("Initializing FAT...o exit)... ");
+	if(!disc_mount()){_consolePrint("Failed.\n");die();}
+	_consolePrint("Done.\n");
 
 	die();
 }

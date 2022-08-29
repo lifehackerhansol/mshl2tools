@@ -54,8 +54,8 @@ clean:
 	rm		DEMO.mse SCDS.mse moonshl2alt.mse $(TARGET).r4isdhc.arm9
 	mv -f		$(TARGET).mse EZ5H.nds EZ5i.nds IMAT.nds Mati.nds TTIO.nds R4DS.nds RPGS.nds RPGN.nds XXXX.nds DEMO.nds SCDS.nds DSI2.nds DSI2_ismart.nds moonshl2alt.nds ../
 	cp		../moonshl2alt.nds ../../
-	dsbize		../moonshl2alt.nds ../g6dsload.eng 0x12
-	dldipatch	../../xenofile/source/dldi/m3ds.dldi ../g6dsload.eng
+	dsbize		../moonshl2alt.nds ../menu.xx 0x12
+	dldipatch	../../xenofile/source/dldi/m3ds.dldi ../menu.xx
 	dsbize		../moonshl2alt.nds ../g003rest.dat 0x23
 	dldipatch	../../xenofile/source/dldi/g003.dldi ../g003rest.dat
 
@@ -71,7 +71,7 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 			-I$(CURDIR)
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
-LIBS	:= ../../libprism/libprism.a -lfat -lnds9
+LIBS	:= ../../libprism/libprism.a -lnds9
 ARCH	:=	-mthumb -mthumb-interwork
 CFLAGS	:=	-Wall -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \

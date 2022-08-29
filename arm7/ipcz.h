@@ -7,11 +7,20 @@
 extern "C" {
 #endif
 
+#if defined(ARM9)
+#define CONST const
+#elif defined(ARM7)
+#define CONST
+#else
+#error only for NDS
+#endif
+
 enum IPCZCommand{
 	ResetRudolph		= 0x01,
 	ResetBootlib		= 0x02,
 	ResetMoonlight	= 0x03,
 	ResetRudolphM		= 0x04,
+	ResetMoonShell2		= 0x05,
 
 	Shutdown		= 0x11,
 	ReturnBootstub	= 0x12,
@@ -23,6 +32,7 @@ enum IPCZCommand{
 
 	GetARM7Bios		= 0x101,
 	GetFirmware		= 0x102,
+	WriteFirmware		= 0x103,
 	RequestBatteryLevel	= 0x111,
 
 	EnableDSTTSDHCFlag	= 0x201,
@@ -38,6 +48,7 @@ enum NDSType{
 	NDSPhat	=0,
 	NDSLite	=1,
 	NDSi		=2,	//eXtra Large hardware is completely the same.
+	ThreeDS	=0x10, //reserved?
 };
 
 typedef struct{
@@ -45,25 +56,28 @@ typedef struct{
 	u32 bootaddress; //Used with ResetMoonlight
 	u32 blanks;
 
-	u16 keysheld;
-	u16 keysdown;
-	u16 keysup;
-	u16 keysrepeat;
-	u16 touchX;
-	u16 touchY;
+	CONST u16 keysheld;
+	CONST u16 keysdown;
+	CONST u16 keysup;
+	CONST u16 keysrepeat;
+	CONST u16 touchX;
+	CONST u16 touchY;
 
-	u16 battery;
-	u8  NDSType;
-	u8  flashmeversion;
-	u8  MAC[6];
-	u16 fwchksum;
-	u32 temperature; // use with /0x1000
-	u32 fwsize;
+	CONST u8  battery;
+	CONST u8  DUMMY;
+	CONST u8  NDSType;
+	CONST u8  flashmeversion;
+	CONST u8  MAC[6];
+	CONST u16 fwchksum;
+	CONST u32 temperature; // use with /0x1000
+	CONST u32 fwsize;
 
 	u8  *arm7bios_addr;
 	u32 arm7bios_bufsize;
 	u8  *firmware_addr;
 	u32 firmware_bufsize;
+	u8  *firmware_write_addr;
+	u32 firmware_write_index; //must be 0,1,2,4,5 //should be u8?
 
 	void *PCM_L;
 	void *PCM_R;
@@ -76,18 +90,14 @@ typedef struct{
 } TransferRegionZ;
 
 //I hope IPC won't be overridden by FIFO...
-//They say after 0x027FF800 is used for NDS settings, so I use 0x027FF700.
-#define IPCZ ((TransferRegionZ volatile *)(0x027FF700))
+//They say after 0x02fFF800 is used for NDS settings, so I use 0x02fFF700.
 
-//experiment... what should I do?
-#define IPCZBuf ((volatile u8*)(0x027Fe800))
-
-#define ROMVERSION "0.70g.101216 Final"
-#define ROMDATE ""__DATE__" "__TIME__" GMT+09:00"
-#ifdef _LIBNDS_MAJOR_
-#define ROMENV "DevKitARMr32 + libnds 1.4.9 + libfat r4456(modified)"
-#else
-#define ROMENV "DevKitARMr23b + libnds-20071023 +\nlibfat-20080530less(modified) [legacy]"
+#ifdef ARM9
+extern TransferRegionZ volatile *IPCZ;
+#define IPCZ_DSiMode ((TransferRegionZ volatile *)(0x0cfFF700))
+#define IPCZ_DSMode ((TransferRegionZ volatile *)(0x02fFF700))
+#elif ARM7
+#define IPCZ ((TransferRegionZ volatile *)(0x02fFF700))
 #endif
 
 #ifdef __cplusplus

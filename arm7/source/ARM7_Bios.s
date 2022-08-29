@@ -14,8 +14,9 @@
 @ is completely locked out from reading.
 @******************************************
 
-.ALIGN
-.GLOBAL	ARM7_Bios
+.align 4
+.global	ARM7_Bios
+.global	SwitchUserMode
 
 @-----------------------------------------------------
 @ key table from the NDS ARM7 BIOS (0x1078Byte)
@@ -26,16 +27,22 @@
 @
 @ Thus, set size as 0x1077 to get only the key table and 0x3fff to get complete bios.
 @
-@ Modified by Xenon to enable setting size.
+@ Modified by X to enable setting size.
 @-----------------------------------------------------
 
-.ARM
+.arm
+SwitchUserMode:
+	push {r0}
+	mov r0, #0x1F
+	msr cpsr, r0
+	pop {r0}
+	bx lr
 
 ARM7_Bios: @ here r0 and r1 are reserved.
 	adr	r2, bios_dump+1
 	bx	r2
     
-.THUMB
+.thumb
 
 bios_dump:
 	push	{r4-r7, lr}
@@ -50,7 +57,7 @@ loop:
 	push	{r2-r6}
 	bx	r0
 
-.ALIGN
+.align 4
 
 ret:
 	strb	r3, [r2,r1]

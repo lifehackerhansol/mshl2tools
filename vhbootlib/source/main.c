@@ -3,7 +3,7 @@ const u16 bgcolor=RGB15(0,0,2);
 
 void Main(){
 	FILE *f;
-	TExtLinkBody extlink;
+	//TExtLinkBody extlink;
 	char target[768];
 	char dldiid[5];
 
@@ -23,38 +23,37 @@ void Main(){
 		_consolePrintf("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
 	}
 
-	_consolePrintf("Initializing libfat... ");
-	if(!fatInitDefault()){_consolePrintf("Failed.\n");die();}
-	_consolePrintf("Done.\n");
+	_consolePrint("Initializing FAT... ");
+	if(!disc_mount()){_consolePrint("Failed.\n");die();}
+	_consolePrint("Done.\n");
 
-	_consolePrintf("Opening extlink... ");
-	if(!(f=fopen("/MOONSHL2/EXTLINK.DAT","rb"))){_consolePrintf("Failed.\n");die();}
-	fread(&extlink,1,sizeof(TExtLinkBody),f);
-	fclose(f);
-	if(extlink.ID!=ExtLinkBody_ID){_consolePrintf("Incorrect ID.\n");die();}
-	_consolePrintf("Done.\n");
-
-	_FAT_directory_ucs2tombs(target,extlink.DataFullPathFilenameUnicode,768);
+	_consolePrint("Opening frontend... ");
+	if(!readFrontend(target)){_consolePrint("Failed.\n");die();}
+	_consolePrint("Done.\n");
 
 	// vvvvvvvvvvv add 2008.03.30 kzat3
-	_consolePrintf("allocating %s...\n",target);
+	//_consolePrintf("allocating %s...\n",target);
 //#ifdef GPL
-	if (!strcmp(dldiid,"EZ5H")||!strcmp(dldiid,"EDGE")||!strcmp(dldiid,"SCDS")
-	||!ret_menu9_Gen(target)){
-		_consolePrintf("falling back to Chishm VRAM bootlib.\n");
+	//if (!strcmp(dldiid,"EZ5H")||!strcmp(dldiid,"EDGE")||!strcmp(dldiid,"SCDS")
+	//||!ret_menu9_Gen(target)){
+		_consolePrint("falling back to Chishm VRAM bootlib.\n");
 		//fifoSendValue32(FIFO_USER_07,2);
-		runNdsFile(target);
+#ifdef LIBFAT
+		return runNdsFile(target);
+#else
+		return runNdsFileViaStub(target);
+#endif
 	//}else{
-	//	_consolePrintf("allocate done.\n");
-	}
+	//	_consolePrint("allocate done.\n");
+	//}
 /*
 #else
 	if(!strcmp(dldiid,"EZ5H")||!strcmp(dldiid,"EDGE")||!strcmp(dldiid,"SCDS"))
-		_consolePrintf("this card not supported by ret_menu*_Gen() but we just try to use it since Chishm VRAM bootlib is not linked.\n");
+		_consolePrint("this card not supported by ret_menu*_Gen() but we just try to use it since Chishm VRAM bootlib is not linked.\n");
 	if(ret_menu9_Gen(target)){
-		_consolePrintf("allocate done.\n");
+		_consolePrint("allocate done.\n");
 	}else{
-		_consolePrintf("allocate failed (Chishm VRAM bootlib is not linked so big nds code cannot load).\n");die();
+		_consolePrint("allocate failed (Chishm VRAM bootlib is not linked so big nds code cannot load).\n");die();
 	}
 #endif
 */
@@ -62,9 +61,9 @@ void Main(){
 	//IPCEX->RESET=RESET;
 	//IPCZ->cmd=ResetRudolph;
        //fifoSendValue32(FIFO_USER_07,1);
-	//_consolePrintf("rebooting... \n");
+	//_consolePrint("rebooting... \n");
 	//ret_menu9_GENs();
-	//_consolePrintf("failed.\n");
+	//_consolePrint("failed.\n");
 	//die();
 	// ^^^^^^^^^^^^ add 2008.03.30 kzat3
 }

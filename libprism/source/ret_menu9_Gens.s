@@ -1,6 +1,6 @@
 @***********************************************************
 @
-@	by Rudolph (çcíÈ)	2007/10/22
+@	by Rudolph 2007/10/22
 @
 @  SoftwareReset Routines for General purpose.
 @************************************************************
@@ -72,8 +72,8 @@ TimDMA_lp:
 	bne	TimDMA_lp
 
 	mov	r0, #0x0
-	ldr	r4, =0x027FFE04
-	str	r0, [r4, #+0x0]			@ *(027ffe04)=#0
+	ldr	r4, =0x02fFFE04
+	str	r0, [r4, #+0x0]			@ *(02fffe04)=#0
 	ldr	r3, =0x80808080
 	mov	r1, #0x4000000
 	str	r3, [r1, #+0x240]		@ *(04000240)=#0x80808080
@@ -81,7 +81,7 @@ TimDMA_lp:
 	mvn	r2, #0x0
 	strh	r2, [r3, #+0x0]			@ *(05000000)=#0xFFFF
 	add	r3, r3, #0x2
-	str	r4, [r1, #+0xD4]		@ *(040000d4)=#0x027ffe04
+	str	r4, [r1, #+0xD4]		@ *(040000d4)=#0x02fffe04
 	ldr	r2, =0x850001FF
 	str	r3, [r1, #+0xD8]		@ *(040000d8)=#0x5000002
 	str	r2, [r1, #+0xDC]		@ *(040000dc)=#0x850001ff
@@ -92,7 +92,7 @@ DMA_lp0:
 	blt	DMA_lp0
 
 	mov	r2, #0x7000000
-	str	r4, [r1, #+0xD4]		@ *(040000d4)=#0x027ffe04
+	str	r4, [r1, #+0xD4]		@ *(040000d4)=#0x02fffe04
 	ldr	r3, =0x85000200
 	str	r2, [r1, #+0xD8]		@ *(040000d8)=#0x7000000
 	str	r3, [r1, #+0xDC]		@ *(040000dc)=#0x85000200
@@ -164,13 +164,25 @@ DMA_lp4:
 	ldr	r5, =0x0000e880
 	str	r5, [r3, #+0x204]	@ *(04000204)=#0x0000e880
 
+	ldr	r0,=0x4004008
+	ldr	r0,[r0]
+	ands	r0,r0,#0x8000
+	bne	dsi_mode
 
-     	ldr	r0, =0x027FFDF8
+     	ldr	r0, =0x02fFFDF8
      	ldr	r1, =0xE51FF004
-     	str	r1, [r0, #0x0]			@ (027ffdf8)=E51FF004:ldr r15,[r15, #-0x4]
-     	str	r0, [r0, #0x4]			@ (027ffdfC)=027FFDF8
+     	str	r1, [r0, #0x0]			@ (02fffdf8)=E51FF004:ldr r15,[r15, #-0x4]
+     	str	r0, [r0, #0x4]			@ (02fffdfC)=02fFFDF8
 
-	bx	r0				@ JUMP 027FFDF8
+	bx	r0				@ JUMP 02fFFDF8
+
+dsi_mode:
+     	ldr	r0, =0x0cfFFDF8
+     	ldr	r1, =0xE51FF004
+     	str	r1, [r0, #0x0]			@ (0cfffdf8)=E51FF004:ldr r15,[r15, #-0x4]
+     	str	r0, [r0, #0x4]			@ (0cfffdfC)=0cfFFDF8
+
+	bx	r0				@ JUMP 0cfFFDF8
 
  .END
 

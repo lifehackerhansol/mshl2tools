@@ -3,7 +3,7 @@ const u16 bgcolor=RGB15(4,0,12);
 
 char usrcheat[27];
 void patchusrcheat(u8* buf){
-	_consolePrintf("Patching usrcheat path...\n");
+	_consolePrint("Patching usrcheat path...\n");
 	char *arm9=(char*)buf+512;
 	u32 size=read32(buf+0x2c),i=0;
 	for(;i<size;i++)
@@ -60,7 +60,6 @@ void Main(){
 	//TExtLinkBody extlink;
 	FILE *f;
 
-	IPCZ->cmd=0;
 	_consolePrintf(
 		"YSMenu Wood Loader\n"
 		"reset_mse_06b_for_ak2 by Moonlight, Rudolph, kzat3\n"
@@ -78,19 +77,19 @@ void Main(){
 		_consolePrintf("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
 	}
 
-	_consolePrintf("initializing libfat... ");
-	if(!fatInitDefault()){_consolePrintf("failed.\n");die();}
-	_consolePrintf("done.\n");
+	_consolePrint("initializing FAT... ");
+	if(!disc_mount()){_consolePrint("failed.\n");die();}
+	_consolePrint("done.\n");
 
 	//magic
 	u8 head[512];
-	*(vu32*)0x023fd900=0x18|(14<<8)|( ((*(u8*)0x023fdbff)&4)?4:0 ); //reset
+	*(vu32*)0x023fd900=0x10|(14<<8)|( ((*(u8*)0x023fdbff)&8)?8:0 )|( ((*(u8*)0x023fdbff)&4)?4:0 ); //reset/DMA
 	*(char*)0x023fda03='0';
 	*(char*)0x023fdc03='0';
 	memcpy(head,(char*)0x023fdc00,512);
 	memcpy((char*)0x023fdd00,head,512);
 
-	_consolePrintf("Looking for usrcheat.dat... ");
+	_consolePrint("Looking for usrcheat.dat... ");
 	struct stat st;
 	if(!stat("/YSMenu/usrcheat.dat",&st)){
 		strcpy(usrcheat,"/YSMenu/usrcheat.dat");
@@ -111,10 +110,10 @@ void Main(){
 	goto finalize;
 
 parsecheat:
-	_consolePrintf("Parsing usrcheat.dat... ");
+	_consolePrint("Parsing usrcheat.dat... ");
 	{
 
-		if(!(f=fopen((char*)0x023fda05,"rb"))){_consolePrintf("Cannot open ROM.\n");die();}
+		if(!(f=fopen((char*)0x023fda05,"rb"))){_consolePrint("Cannot open ROM.\n");die();}
 		fread(head,1,512,f);
 		u32 gamecode=read32(head+12),CRC32=crc32(0xffffffff,head,512);
 		fclose(f);
@@ -142,11 +141,11 @@ parsecheat:
 							}
 							free(p);
 						}
-						_consolePrintf("Done.\n");
+						_consolePrint("Done.\n");
 						break;
 					}
 					if(!next.offset){
-						_consolePrintf("Not found.\n");
+						_consolePrint("Not found.\n");
 						break;
 					}
 				}
