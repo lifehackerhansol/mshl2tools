@@ -42,6 +42,9 @@ bool runTextEdit(char *file);
 bool runExtLink(char *file,char *ext);
 int iterateExtLink(int start);
 
+bool runAssoc(char *file,char *ext);
+int iterateAssoc(int start);
+
 bool runRPGLink(const char *file);
 
 //pref

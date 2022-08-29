@@ -4,7 +4,7 @@ endif
 
 include $(DEVKITARM)/ds_rules
 
-export TARGET		:=	wdayloader
+export TARGET		:=	mondayloader
 export TOPDIR		:=	$(CURDIR)
 export PATH		:=	$(DEVKITARM)/bin:$(PATH)
 
@@ -16,7 +16,7 @@ clean:
 
 ### final build script ###
 ../$(TARGET).nds	:	$(TARGET).arm9
-	ndstool	-c $(TARGET).nds -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -e9 0x02000000 -b $(TARGET).bmp "WdayLoader"
+	ndstool	-c $(TARGET).nds -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -e9 0x02000000 -b $(TARGET).bmp "MondayLoader NDS"
 	mv -f	$(TARGET).nds ../
 
 ### compile main.c ###

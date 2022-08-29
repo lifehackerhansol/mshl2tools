@@ -554,15 +554,19 @@ u32 getFatDataPointer(){ //for getTrueSector
 	return p->database-128; //back 2 clusters
 }
 
-void getsfnlfn(const char *path,char *sfn,u16 *lfn){ //path should be in UTF8
+void getsfnlfn(const char *_path,char *sfn,u16 *lfn){ //path should be in UTF8
 	static char buf[256*3],ret[256*3];
 	int i=1,len;
 	FILINFO fs;
 
+	if(!_path)return;
+	if(!strchr(_path,'/'))return;
 	if(!sfn&&!lfn)return;
 	memset(&buf,0,256*3);
 	memset( sfn,0,256);
 	memset(&ret,0,256*3);
+	const char *path=_path;
+	for(;*path!='/';path++);
 	//if(!memcmp(path,"/./",3))path+=2;
 	len=strlen(path);
 	for(;i<=len;i++){

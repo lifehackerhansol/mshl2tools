@@ -22,8 +22,8 @@ INCLUDES	:=	build
 #---------------------------------------------------------------------------------
 ARCH	:=	-mthumb -mthumb-interwork
 
-CFLAGS	:=	-Wall -O2\
-			-mcpu=arm7tdmi -mtune=arm7tdmi -fomit-frame-pointer\
+CFLAGS	:=	-Wall -Wno-unused-but-set-variable -Os \
+			-mcpu=arm7tdmi -mtune=arm7tdmi -fomit-frame-pointer \
 			-ffast-math \
 			$(ARCH)
 

@@ -229,7 +229,7 @@ void Main(){
 			}
 		}else if(useak2==3&&!memcmp(dldiid,"RPG",3)){
 			char tmp[776];
-			strcpy(tmp,"fat1:");
+			strcpy(tmp,"fat1:"); //fat1: means TF rather than internal NAND.
 			strcpy(tmp+5,utf8);
 			ini_puts("Save Info","lastLoaded",tmp,"/__rpg/lastsave.ini");
 			getsfnlfn(utf8,tmp+5,NULL);
@@ -455,6 +455,7 @@ void Main(){
 			}
 
 			_consolePrint("OK.\nRebooting to /CycloDS/reset.mse...\n");
+			//we should use legacy loading scheme, as we cannot distinguish between Cyclo Evolution and iEvolution...
 			ret_menu9_Gen("/CycloDS/reset.mse");
 		}else{
 			ini_puts("YSMenu","AUTO_BOOT",utf8,ininame);

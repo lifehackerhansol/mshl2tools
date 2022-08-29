@@ -37,6 +37,12 @@ cd ../..
 cd fwrecovery/source
 make
 cd ../..
+cd gbadump/source
+make
+cd ../..
+cd google2fa/source
+make
+cd ../..
 cd iniclear/source
 make
 cd ../..

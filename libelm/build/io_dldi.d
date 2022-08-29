@@ -1,1 +1,1 @@
-io_dldi.o: /opt/mshl2tools/r32/libelm/source/io_dldi.s
+io_dldi.o: /opt/mshl2tools/r37/libelm/source/io_dldi.s

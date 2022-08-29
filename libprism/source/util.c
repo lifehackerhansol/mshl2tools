@@ -682,17 +682,24 @@ int filelength(int fd){ //Windows compatible
 	return st.st_size;
 }
 
-int copy(const char *old, const char *new){
+int copy(const char *old, const char *_new){
 	FILE *in=fopen(old,"rb");
 	if(!in)return 1;
-	FILE *out=fopen(new,"wb");
-	if(!out){fclose(in);return 2;}
 	int size=filelength(fileno(in));
-	int read,cur=0;
+	FILE *out=fopen(_new,"r+b");
+	if(out){
+		int osize=filelength(fileno(out));
+		if(osize==size)goto copy_progress; //use r+b handle to avoid cluster reallocation.
+		fclose(out);
+	}
+	out=fopen(_new,"wb");
+	if(!out){fclose(in);return 2;}
+copy_progress:;
+	int readlen,cur=0;
 	_consoleStartProgress2();
-	while((read=fread(libprism_buf,1,BUFLEN,in))>0){
-		cur+=read;
-		fwrite(libprism_buf,1,read,out);
+	while((readlen=fread(libprism_buf,1,BUFLEN,in))>0){
+		cur+=readlen;
+		fwrite(libprism_buf,1,readlen,out);
 		_consolePrintProgress2("Copying",cur,size);
 	}
 	_consoleEndProgress2();
@@ -732,44 +739,94 @@ void installargv(u8 *top, void *store){
 #endif
 }
 
-char *makeargv(const char *str){ //str is memory obtained by fread argv file.
+#if 0
+struct __argv {
+	int argvMagic;		//!< argv magic number, set to 0x5f617267 ('_arg') if valid 
+	char *commandLine;	//!< base address of command line, set of null terminated strings ///argvToInstall///
+	int length;		//!< total length of command line ///argvToInstallSize///
+	int argc;		//!< internal use, number of arguments
+	char **argv;		//!< internal use, argv pointer
+};
+#endif
+
+char *parseargv(const char *str){ //str is memory obtained by fread argv file.
 	if(argvToInstall)free(argvToInstall);
 	argvToInstallSize=0;
 	if(!str&&!*str)return NULL; //this will cause program to crash, be careful bah
 	int i,j;
 	char *seps="\n\r\t #";
+
 	//char c;
 	//1st: get size
-	for(i=0;i<strlen(str);i++){
-		if(strchr(seps,str[i])){
-			if(argvToInstallSize)argvToInstallSize++;
-			for(;i<strlen(str)&&strchr(seps,str[i]);i++)
+	int quote=0;
+	for(i=0;i<strlen(str)&&strchr(seps,str[i]);i++) //skip continuous separater
+		if(str[i]=='#')
+			for(;i<strlen(str)&&str[i]!='\n';i++);
+
+	int start=i;
+	for(i=start;i<strlen(str);i++){
+		if(strchr(seps,str[i])&&(str[i]!=' '||!quote)){ //malformed argv file will cause bug...
+			for(;i<strlen(str)&&strchr(seps,str[i]);i++) //skip continuous separater
 				if(str[i]=='#')
-					for(;i<strlen(str)&&str[i]=='\n';i++);
+					for(;i<strlen(str)&&str[i]!='\n';i++);
+			argvToInstallSize++; //counted as one separator.
 		}
+		if(str[i]=='\"'){quote^=1;continue;}
 		argvToInstallSize++;
 	}
 	if(!strchr(seps,str[strlen(str)-1]))argvToInstallSize++;
 
+	if(!argvToInstallSize)return NULL;
 	argvToInstall=(char*)malloc(argvToInstallSize+4); //4==strlen("fat:")
 	if(!argvToInstall){argvToInstallSize=0;return NULL;}
+
 	//2nd: make
-	for(i=j=0;i<strlen(str);i++){
-		if(strchr(seps,str[i])){
-			if(j)argvToInstall[j++]=0;
-			for(;i<strlen(str)&&strchr(seps,str[i]);i++)
+	quote=0;
+	for(i=start,j=0;i<strlen(str);i++){
+		if(strchr(seps,str[i])&&(str[i]!=' '||!quote)){ //malformed argv file will cause bug...
+			for(;i<strlen(str)&&strchr(seps,str[i]);i++) //skip continuous separater
 				if(str[i]=='#')
-					for(;i<strlen(str)&&str[i]=='\n';i++);
+					for(;i<strlen(str)&&str[i]!='\n';i++);
+			argvToInstall[j++]=0; //counted as one separator.
+		}else{
+			if(!j && str[i]=='/'){ //force to add fat: to argv[0]
+				strcpy(argvToInstall,mydrive);
+				argvToInstall[strlen(argvToInstall)-1]=0; // "fat:/(/)" -> "fat:(/)"
+				argvToInstallSize+=strlen(argvToInstall);
+				j=strlen(argvToInstall);
+			}
 		}
-		if(!j && str[i]=='/'){ //force to add fat: to argv[0]
-			strcpy(argvToInstall,mydrive);
-			argvToInstall[strlen(argvToInstall)-1]=0;
-			argvToInstallSize+=strlen(argvToInstall);
-			j=strlen(argvToInstall);
-		}
+		if(str[i]=='\"'){quote^=1;continue;}
 		argvToInstall[j++]=str[i];
 	}
 	if(!strchr(seps,str[strlen(str)-1]))argvToInstall[j++]=0;
+	return argvToInstall;
+}
+
+char *makeargv(const char *str){ //make it in faster way...
+	if(argvToInstall)free(argvToInstall);
+	argvToInstallSize=0;
+	if(!str&&!*str)return NULL; //this will cause program to crash, be careful bah
+	char *seps="\n\r\t";
+
+	argvToInstallSize=strlen(str);
+	if(!strchr(seps,str[strlen(str)-1]))argvToInstallSize++;
+
+	if(!argvToInstallSize)return NULL;
+	argvToInstall=(char*)malloc(argvToInstallSize+4); //4==strlen("fat:")
+	if(!argvToInstall){argvToInstallSize=0;return NULL;}
+
+	int i=0,j=0;
+	if(str[0]=='/'){
+		strcpy(argvToInstall,mydrive);
+		argvToInstall[strlen(argvToInstall)-1]=0; // "fat:/(/)" -> "fat:(/)"
+		argvToInstallSize+=strlen(argvToInstall);
+		j=strlen(argvToInstall);
+	}
+	strcpy(argvToInstall+j,str);
+	for(;i<strlen(str);i++)
+		if(strchr(seps,argvToInstall[j+i]))argvToInstall[j+i]=0;
+	if(!strchr(seps,str[strlen(str)-1]))argvToInstall[j+i]=0;
 	return argvToInstall;
 }
 
