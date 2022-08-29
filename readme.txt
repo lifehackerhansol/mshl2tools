@@ -930,7 +930,11 @@ Fixed minor stuff.
 Rebuilt using devkitARMr42 and libnds 1.5.8.
 Updated libfat.
 
-0.91f.150301 Phase:neige
+0.91f.150301 Phase:Neige
 Rebuilt using devkitARMr44 and libnds 1.5.10.
 Updated libfat.
+
+0.91g.160319 Phase:Neige
+Rebuilt using devkitARMr45 and libnds 1.5.12.
+Fixed minor stuff.
 
