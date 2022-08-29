@@ -245,6 +245,9 @@ int _FAT_open_r (struct _reent *r, void *fileStruct, const char *path, int flags
 	file->prevOpenFile = NULL;
 	partition->firstOpenFile = file;
 
+	file->fsyncmoddate=file->fsyncmodtime=file->fsyncacdate=0;
+	file->fsyncattr=0xff;
+
 	_FAT_unlock(&partition->lock);
 
 	return (int) file;
@@ -277,14 +280,28 @@ int _FAT_syncToDisc (FILE_STRUCT* file) {
 		u16_to_u8array (dirEntryData, DIR_ENTRY_clusterHigh, file->startCluster >> 16);
 
 		// Modification time and date
-		u16_to_u8array (dirEntryData, DIR_ENTRY_mTime, _FAT_filetime_getTimeFromRTC());
-		u16_to_u8array (dirEntryData, DIR_ENTRY_mDate, _FAT_filetime_getDateFromRTC());
+		u16 moddate,modtime,acdate;
+		moddate=acdate=_FAT_filetime_getDateFromRTC();
+		modtime=_FAT_filetime_getTimeFromRTC();
+
+		if(file->fsyncmoddate){
+			moddate=file->fsyncmoddate;
+			modtime=file->fsyncmodtime;
+		}
+		if(file->fsyncacdate)acdate=file->fsyncacdate;
+
+		u16_to_u8array (dirEntryData, DIR_ENTRY_mTime, modtime);
+		u16_to_u8array (dirEntryData, DIR_ENTRY_mDate, moddate);
 
 		// Access date
-		u16_to_u8array (dirEntryData, DIR_ENTRY_aDate, _FAT_filetime_getDateFromRTC());
+		u16_to_u8array (dirEntryData, DIR_ENTRY_aDate, acdate);
 
 		// Set archive attribute
-		dirEntryData[DIR_ENTRY_attributes] |= ATTRIB_ARCH;
+		if(file->fsyncattr!=0xff){
+			dirEntryData[DIR_ENTRY_attributes] &= 0xf8;
+			dirEntryData[DIR_ENTRY_attributes] |= file->fsyncattr&7;
+		}
+		if(!(dirEntryData[DIR_ENTRY_attributes]&ATTRIB_DIR))dirEntryData[DIR_ENTRY_attributes] |= ATTRIB_ARCH;
 
 		// Write the new entry
 		_FAT_cache_writePartialSector (file->partition->cache, dirEntryData,
@@ -655,16 +672,17 @@ ssize_t _FAT_write_r (struct _reent *r, int fd, const char *ptr, size_t len) {
 	_FAT_lock(&partition->lock);
 
 	// Only write up to the maximum file size, taking into account wrap-around of ints
-	if (remain + file->filesize > FILE_MAX_SIZE || len + file->filesize < file->filesize) {
+	if (len + file->filesize > FILE_MAX_SIZE || len + file->filesize < file->filesize) {
 		len = FILE_MAX_SIZE - file->filesize;
 	}
-	remain = len;
 
 	// Short circuit cases where len is 0 (or less)
 	if (len <= 0) {
 		_FAT_unlock(&partition->lock);
 		return 0;
 	}
+
+	remain = len;
 
 	// Get a new cluster for the start of the file if required
 	if (file->startCluster == CLUSTER_FREE) {

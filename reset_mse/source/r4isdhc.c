@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #define S 433264
 
 int main(int argc, char **argv){

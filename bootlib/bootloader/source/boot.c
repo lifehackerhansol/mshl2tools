@@ -30,12 +30,10 @@ License:
  project at chishm@hotmail.com
  
 Helpful information:
- This code runs from the first Shared IWRAM bank:
- 0x037F8000 to 0x037FC000
+ This code runs from VRAM bank C on ARM7
 ------------------------------------------------------------------*/
 
 #include <nds/ndstypes.h>
-#include <nds/registers_alt.h>
 #include <nds/dma.h>
 #include <nds/system.h>
 #include <nds/interrupts.h>
@@ -48,26 +46,31 @@ Helpful information:
 #undef ARM9
 #define ARM7
 #include <nds/arm7/audio.h>
-#include <nds/fifocommon.h>
+
+#include <nds/fifocommon.h> //PM_LED_BLINK
+#include <nds/ipc.h>
 
 #include "fat.h"
 #include "dldi_patcher.h"
 
+void arm7clearRAM();
+
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Important things
-#define TEMP_MEM 0x027FE000
-#define NDS_HEAD 0x027FFE00
-#define TEMP_ARM9_START_ADDRESS (*(vu32*)0x027FFFF4)
+#define TEMP_MEM 0x02FFE000
+#define NDS_HEAD 0x02FFFE00
+#define TEMP_ARM9_START_ADDRESS (*(vu32*)0x02FFFFF4)
 
 
-//#define STORED_FILE_CLUSTER (*(vu32*)0x027FFFFC)
-
-#define ARM9_START_FLAG (*(vu8*)0x027FFDFF)
+#define ARM9_START_FLAG (*(vu8*)0x02FFFDFF)
 const char* bootName = "_BOOT_DS.NDS";
 
+extern unsigned long _start;
 extern unsigned long storedFileCluster;
 extern unsigned long initDisc;
 extern unsigned long wantToPatchDLDI;
+extern unsigned long argStart;
+extern unsigned long argSize;
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Firmware stuff
@@ -99,132 +102,42 @@ void boot_readFirmware (uint32 address, uint8 * buffer, uint32 size) {
   REG_SPICNT = 0;
 }
 
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// Loader functions
-
-void CpuFastSet (u32 src, u32 dest, u32 ctrl)
-{
-	__asm volatile ("swi 0x0C0000\n");
-}
-
-static inline void MYdmaFillWords(const void* src, void* dest, uint32 size) {
-	DMA_SRC(3)  = (uint32)src;
-	DMA_DEST(3) = (uint32)dest;
-	DMA_CR(3)   = DMA_COPY_WORDS | DMA_SRC_FIX | (size>>2);
-	while(DMA_CR(3) & DMA_BUSY);
-}
 
 static inline void copyLoop (u32* dest, const u32* src, u32 size) {
+	size = (size +3) & ~3;
 	do {
 		*dest++ = *src++;
 	} while (size -= 4);
 }
 
-#define resetCpu() \
-		__asm volatile("swi 0x000000")
+//#define resetCpu() __asm volatile("\tswi 0x000000\n");
 
 /*-------------------------------------------------------------------------
-resetMemory1_ARM9
-Clears the ARM9's icahce and dcache
-Written by Darkain.
-Modified by Chishm:
- Changed ldr to mov & add
- Added clobber list
+passArgs_ARM7
+Copies the command line arguments to the end of the ARM9 binary, 
+then sets a flag in memory for the loaded NDS to use
 --------------------------------------------------------------------------*/
-/*
-#define resetMemory1_ARM9_size 0x400
-void __attribute__ ((long_call)) resetMemory1_ARM9 (void) 
-{
-	// Return to loop
-	*((vu32*)0x027FFE04) = (u32)0xE59FF018;		// ldr pc, 0x027FFE24
-	*((vu32*)0x027FFE24) = (u32)0x027FFE04;		// Set ARM9 Loop address
-	__asm volatile("bx %0" : : "r" (0x027FFE04) ); 
-}
-*/
-/*-------------------------------------------------------------------------
-resetMemory2_ARM9
-Clears the ARM9's DMA channels and resets video memory
-Written by Darkain.
-Modified by Chishm:
- * Changed MultiNDS specific stuff
---------------------------------------------------------------------------*/
-#define resetMemory2_ARM9_size 0x400
-void __attribute__ ((long_call)) resetMemory2_ARM9 (void) 
-{
- 	register int i;
-
-	REG_IME = 0;
-	REG_IE = 0;
-	REG_IF = ~0;
-	(*(vu32*)0x00803FFC) = 0;   //IRQ_HANDLER ARM9 version
-	(*(vu32*)0x00803FF8) = ~0;  //VBLANK_INTR_WAIT_FLAGS ARM9 version
-
-	//clear out ARM9 DMA channels
-	for (i=0; i<4; i++) {
-		DMA_CR(i) = 0;
-		DMA_SRC(i) = 0;
-		DMA_DEST(i) = 0;
-		TIMER_CR(i) = 0;
-		TIMER_DATA(i) = 0;
-	}
-
-	VRAM_CR = (VRAM_CR & 0xffff0000) | 0x00008080 ;
-	(*(vu32*)0x027FFE04) = 0;   // temporary variable
-	BG_PALETTE[0] = 0xFFFF;
-	MYdmaFillWords((void*)0x027FFE04, BG_PALETTE+1, (2*1024)-2);
-	MYdmaFillWords((void*)0x027FFE04, OAM,     2*1024);
-	MYdmaFillWords((void*)0x027FFE04, (void*)0x04000000, 0x56);  //clear main display registers
-	MYdmaFillWords((void*)0x027FFE04, (void*)0x04001000, 0x56);  //clear sub  display registers
-	MYdmaFillWords((void*)0x027FFE04, VRAM,  656*1024);
-
+void passArgs_ARM7 (void) {
+	u32 ARM9_DST = *((u32*)(NDS_HEAD + 0x028));
+	u32 ARM9_LEN = *((u32*)(NDS_HEAD + 0x02C));
+	u32* argSrc;
+	u32* argDst;
 	
-	REG_DISPSTAT = 0;
-	videoSetMode(0);
-	videoSetModeSub(0);
-	VRAM_A_CR = 0;
-	VRAM_B_CR = 0;
-// Don't mess with the ARM7's VRAM
-//	VRAM_C_CR = 0;
-	VRAM_D_CR = 0;
-	VRAM_E_CR = 0;
-	VRAM_F_CR = 0;
-	VRAM_G_CR = 0;
-	VRAM_H_CR = 0;
-	VRAM_I_CR = 0;
-//	VRAM_CR   = 0x03000000;
-	REG_POWERCNT  = 0x820F;
-
-	//set shared ram to ARM7
-	WRAM_CR = 0x03;
-
-	// Return to loop
-	*((vu32*)0x027FFE04) = (u32)0xE59FF018;		// ldr pc, 0x027FFE24
-	*((vu32*)0x027FFE24) = (u32)0x027FFE04;		// Set ARM9 Loop address
-	__asm volatile("bx %0" : : "r" (0x027FFE04) ); 
+	if (!argStart || !argSize) return;
+	
+	argSrc = (u32*)(argStart + (int)&_start);
+	
+	argDst = (u32*)((ARM9_DST + ARM9_LEN + 3) & ~3);		// Word aligned 
+	
+	copyLoop(argDst, argSrc, argSize);
+	
+	__system_argv->argvMagic = ARGV_MAGIC;
+	__system_argv->commandLine = (char*)argDst;
+	__system_argv->length = argSize;
 }
 
 
-/*-------------------------------------------------------------------------
-startBinary_ARM9
-Jumps to the ARM9 NDS binary in sync with the display and ARM7
-Written by Darkain.
-Modified by Chishm:
- * Removed MultiNDS specific stuff
---------------------------------------------------------------------------*/
-#define startBinary_ARM9_size 0xA0
-void __attribute__ ((long_call)) startBinary_ARM9 (void)
-{
-	REG_EXMEMCNT = 0xE880;
-	// set ARM9 load address to 0 and wait for it to change again
-	ARM9_START_FLAG = 0;
-	while(REG_VCOUNT!=191);
-	while(REG_VCOUNT==191);
-	while ( ARM9_START_FLAG != 1 );
-	// wait for vblank
-	while(REG_VCOUNT!=191);
-	while(REG_VCOUNT==191);
-	resetCpu();
-}
+
 
 /*-------------------------------------------------------------------------
 resetMemory_ARM7
@@ -260,7 +173,6 @@ void resetMemory_ARM7 (void)
 	}
 	
 	arm7clearRAM();
-
 
 	REG_IE = 0;
 	REG_IF = ~0;
@@ -317,19 +229,99 @@ Written by Darkain.
 Modified by Chishm:
  * Removed MultiNDS specific stuff
 --------------------------------------------------------------------------*/
-#define startBinary_ARM7_size 0xB0
-void startBinary_ARM7 (void)
-{
+void startBinary_ARM7 (void) {	
+	REG_IME=0;
 	while(REG_VCOUNT!=191);
 	while(REG_VCOUNT==191);
-	
 	// copy NDS ARM9 start address into the header, starting ARM9
+	*((vu32*)0x02FFFE24) = TEMP_ARM9_START_ADDRESS;
 	ARM9_START_FLAG = 1;
+	// Start ARM7
+	VoidFn arm7code = *(VoidFn*)(0x2FFFE34);
+	arm7code();
+}
 
+
+/*-------------------------------------------------------------------------
+resetMemory2_ARM9
+Clears the ARM9's DMA channels and resets video memory
+Written by Darkain.
+Modified by Chishm:
+ * Changed MultiNDS specific stuff
+--------------------------------------------------------------------------*/
+#define resetMemory2_ARM9_size 0x400
+void __attribute__ ((long_call)) __attribute__((naked)) __attribute__((noreturn)) resetMemory2_ARM9 (void) 
+{
+ 	register int i;
+	REG_IPC_FIFO_CR=IPC_FIFO_ENABLE|IPC_FIFO_SEND_CLEAR;
+  
+	//clear out ARM9 DMA channels
+	for (i=0; i<4; i++) {
+		DMA_CR(i) = 0;
+		DMA_SRC(i) = 0;
+		DMA_DEST(i) = 0;
+		TIMER_CR(i) = 0;
+		TIMER_DATA(i) = 0;
+	}
+
+	VRAM_CR = (VRAM_CR & 0xffff0000) | 0x00008080 ;
+	
+	u16 *mainregs = (u16*)0x04000000;
+	u16 *subregs = (u16*)0x04001000;
+	
+	for (i=0; i<43; i++) {
+		mainregs[i] = 0;
+		subregs[i] = 0;
+	}
+	
+	REG_DISPSTAT = 0;
+
+	VRAM_A_CR = 0;
+	VRAM_B_CR = 0;
+// Don't mess with the ARM7's VRAM
+//	VRAM_C_CR = 0;
+	VRAM_D_CR = 0;
+	VRAM_E_CR = 0;
+	VRAM_F_CR = 0;
+	VRAM_G_CR = 0;
+	VRAM_H_CR = 0;
+	VRAM_I_CR = 0;
+	REG_POWERCNT  = 0x820F;
+
+	//set shared ram to ARM7
+	WRAM_CR = 0x03;
+
+	// Return to passme loop
+	*((vu32*)0x02FFFE04) = (u32)0xE59FF018;		// ldr pc, 0x02FFFE24
+	*((vu32*)0x02FFFE24) = (u32)0x02FFFE04;		// Set ARM9 Loop address
+
+	asm volatile(
+		"\tbx %0\n"
+		: : "r" (0x02FFFE04)
+	);
+	while(1);
+}
+
+/*-------------------------------------------------------------------------
+startBinary_ARM9
+Jumps to the ARM9 NDS binary in sync with the display and ARM7
+Written by Darkain.
+Modified by Chishm:
+ * Removed MultiNDS specific stuff
+--------------------------------------------------------------------------*/
+#define startBinary_ARM9_size 0x100
+void __attribute__ ((long_call)) __attribute__((noreturn)) __attribute__((naked)) startBinary_ARM9 (void)
+{
+	REG_IME=0;
+	REG_EXMEMCNT = 0xE880;
+	// set ARM9 load address to 0 and wait for it to change again
+	ARM9_START_FLAG = 0;
 	while(REG_VCOUNT!=191);
 	while(REG_VCOUNT==191);
-	// Start ARM7
-	resetCpu();
+	while ( ARM9_START_FLAG != 1 );
+	VoidFn arm9code = *(VoidFn*)(0x2FFFE24);
+	arm9code();
+	while(1);
 }
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -350,15 +342,13 @@ int main (void) {
 	{
 		return -1;
 	}
-
-	//writePowerManagement(0, readPowerManagement(0) | PM_BACKLIGHT_BOTTOM | PM_BACKLIGHT_TOP);
-
+	
 	// ARM9 clears its memory part 2
 	// copy ARM9 function to RAM, and make the ARM9 jump to it
 	copyLoop((void*)TEMP_MEM, (void*)resetMemory2_ARM9, resetMemory2_ARM9_size);
-	(*(vu32*)0x027FFE24) = (u32)TEMP_MEM;	// Make ARM9 jump to the function
+	(*(vu32*)0x02FFFE24) = (u32)TEMP_MEM;	// Make ARM9 jump to the function
 	// Wait until the ARM9 has completed its task
-	while ((*(vu32*)0x027FFE24) == (u32)TEMP_MEM);
+	while ((*(vu32*)0x02FFFE24) == (u32)TEMP_MEM);
 
 	// Get ARM7 to clear RAM
 	resetMemory_ARM7();	
@@ -366,22 +356,22 @@ int main (void) {
 	// ARM9 enters a wait loop
 	// copy ARM9 function to RAM, and make the ARM9 jump to it
 	copyLoop((void*)TEMP_MEM, (void*)startBinary_ARM9, startBinary_ARM9_size);
-	(*(vu32*)0x027FFE24) = (u32)TEMP_MEM;	// Make ARM9 jump to the function
+	(*(vu32*)0x02FFFE24) = (u32)TEMP_MEM;	// Make ARM9 jump to the function
 
 	writePowerManagement(0, readPowerManagement(0) | PM_LED_BLINK);
-	//REG_POWERCNT|=PM_LED_BLINK;
 	// Load the NDS file
 	loadBinary_ARM7(fileCluster);
 	writePowerManagement(0, readPowerManagement(0) &0xffffffcf);
-	//REG_POWERCNT&=0xffffffcf;
-
+	
 	// Patch with DLDI if desired
 	if (wantToPatchDLDI) {
-		dldi((u8*)((u32*)NDS_HEAD)[0x0A], ((u32*)NDS_HEAD)[0x0B]);
+		dldi ((u8*)((u32*)NDS_HEAD)[0x0A], ((u32*)NDS_HEAD)[0x0B]);
 	}
-	
+
+	// Pass command line arguments to loaded program
+	passArgs_ARM7();
+
 	startBinary_ARM7();
 
 	return 0;
 }
-

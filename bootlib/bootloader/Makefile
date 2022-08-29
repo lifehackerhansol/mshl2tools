@@ -16,14 +16,13 @@ export TARGET		:= boot
 BUILD		:=	build
 SOURCES		:=	source source/patches 
 INCLUDES	:=	build
-SPECS		:=  specs
  
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
 ARCH	:=	-mthumb-interwork
 
-CFLAGS	:=	-g -Wall -O3\
+CFLAGS	:=	-g -Wall -O2\
 			-mcpu=arm7tdmi -mtune=arm7tdmi -fomit-frame-pointer\
 			-ffast-math \
 			$(ARCH)
@@ -31,7 +30,7 @@ CFLAGS	:=	-g -Wall -O3\
 CFLAGS	+=	$(INCLUDE) -DARM7
 
 ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-specs=../$(SPECS)/load.specs -T ../$(SPECS)/load.ld -g $(ARCH) -mno-fpu -Wl,-Map,$(TARGET).map
+LDFLAGS	=	-nostartfiles -T $(CURDIR)/../load.ld -g $(ARCH) -mno-fpu -Wl,-Map,$(TARGET).map
 
 LIBS	:= -lnds7
 
@@ -83,16 +82,13 @@ export LD	:=	$(CC)
 #---------------------------------------------------------------------------------
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
-	@make -C $(SPECS)
 	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
  
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
 	@rm -fr $(BUILD) *.elf
-	@make -C $(SPECS) clean
- 
- 
+
 #---------------------------------------------------------------------------------
 else
  
@@ -104,18 +100,10 @@ DEPENDS	:=	$(OFILES:.o=.d)
 $(LOADBIN)	:	$(ARM7ELF)
 	@$(OBJCOPY) -O binary $< $@
 	@echo built ... $(notdir $@)
-	#cp -f $@ ../../mshl2wrap/source/arm9/data/
-	#cp -f $@ ../../reset_mse/source/arm9/data/
-	#cp -f $@ ../../favlauncher_bl/source/arm9/data/
-	#cp -f $@ ../../vhbootlib/source/arm9/data/
-	#cp -f $@ ../../iniclear/source/arm9/data/
-	#cp -f $@ ../../inilink/source/arm9/data/
 
 $(ARM7ELF)	:	$(OFILES)
 	@echo linking $(notdir $@)
 	@$(LD)  $(LDFLAGS) $(OFILES) $(LIBPATHS) $(LIBS) -o $@
-
-
  
 #---------------------------------------------------------------------------------------
 endif

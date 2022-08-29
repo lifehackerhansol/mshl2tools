@@ -1,22 +1,34 @@
 MoonShell2 Tools
 Here are tools for utilize MoonShell2.
 
-mshl2wrap    (Link Launcher):
-	Workaround for launching commercial roms on MoonShell (>= 2.07)
-inilink      (inilinker xxxloader multibyte):
-	YSMenu/AKAIO/AK2/M3TouchPod extlink which accepts multibyte characters
-iniclear:
-	clear ini then load the menu
-dldicaptor   (DLDI Captor):
-	makes dldi FILE from dldi ON MEMORY
-reset_mse    (MoonShellExecute Soft Reset DLDI) (only in r31):
-	Very common nds reset/loader.
-favlauncher  (FavLauncher) (only in r31):
-	Launch NDS along with the button held.
-resetproxy (only in r31):
-	Launch /moonshl2/resetmse/xxxx.nds. Useful in "multicarts on one TF".
-m3sakura_boot (only in r31):
-	Write /system/m3sakura/dldibody.bin then launch /m3sakura.dat. Useful in "multicarts on one TF".
+***
+Currently devkitARM r23b/r27/r28/r30/r31 are supported. r20-r23 requires special rename wrapper like
+void rename(const char *old, const char *new){copy(old,new);unlink(old);}
+***
+
+dldicaptor     - Capture DLDI to file
+mshl2wrap      - [extlink] Workaround to launch commercial roms on MoonShell >=2.07
+iniclear       - Clear autoboot info
+inilink        - [extlink] Set autoboot info for kernels
+reset_m3       - Fast DSBooter loader
+reset_mse      - Fast NDS loader
+resetproxy     - reset.mse which launchs /moonshl2/resetmse/xxxx.nds
+m3sakura_boot  - Write /system/m3sakura/dldibody.bin then boot m3sakura.dat
+favlauncher    - A simple launcher. You can have 13 selection.
+favlauncher_bl - favlauncher which uses bootlib
+favlauncher_ms - favlauncher which uses moonshellreset
+ak2loader      - [extlink] launch /akloader.nds (ak2loader.nds)
+dscoverloader  - DSCovered general extlink wrapper
+m3loader       - [extlink] launch /system/minigame.* or /_system_/_sys_data/r4_firends.ext
+m3dscover      - modified m3loader for DSCovered
+ndslink        - makes link file for mshl2wrap
+r4loader       - [extlink] launch /__rpg/r4loader.nds
+ysall          - YSMenu for all flashcart
+vhbootlib      - Alternative VeryHugeNDSLoader
+savbackup      - sav backupper
+m3region       - show M3 cart region
+nds_backup_tool_memory - You can dump DS card using NDS main memory, as another libcarddump frontend
+xenofile       - simple and sophisticated filer
 
 linktemplate: .nds with no execution code; ONLY USE WITH nds.mshl2wrap.nds IN EXTLINK (of course with this method you cannot use other launchers such as M3Sakura DLDI). But only 6208 bytes.
 
@@ -180,23 +192,23 @@ Now hbmode 2 is forced if (hbmode==1)&&(ARM9 address!=0x02000000). Avoids some i
 Rebuilt with devkitARMr30. Finalized.
 * ak2loader/DScovered loader merged.
 
-100405 Diff
+100405 Diff (0.37a)
 * unneeded chishm.bin linked to inilink, removed
 * Now favlauncher supports UseNone feature (if no buttons are pressed None= will be launched).
 * But as I don't recommend it, you have to set UseNone=1 in favlauncher.ini.
 
-100419 Diff
+100419 Diff (0.37b)
 * inilink / iniclear now supports (my custom version of) WoodR4.
 
-100422 Diff
+100422 Diff (0.37c)
 * inilink / iniclear now supports WoodRPG with autorunWithLastRom. Ini isn't compatible with before so look inilink.ini carefully.
 
-100515 Diff
+100515 Diff (0.37d)
 * inilink / iniclear now supports R4iTT(beta).
 * iniclear and reset_mse can be used on R4iSDHC(redbox).
 * Added m3loader, which directly launch /system/minigame.* or /_system_/_sys_data/r4_firends.ext.
 
-100519 Diff
+100519 Diff (0.37e)
 * added NDSLink on DS.
 
 0.38.100520.F2
@@ -207,7 +219,7 @@ Since mshl2wrap couldn't load some loaders, now it uses moonshellreset+bootlib.
 Now you can press A to shutdown when dldicaptor/ndslink is completed or rebooting is failed.
 * favlauncher_bl is no longer "test".
 
-100523 Diff
+100523 Diff (0.38a)
 * m3loader now can load r4_homebrew.ext for a homebrew loading. ini isn't compatible with before.
 
 0.39.100527
@@ -227,7 +239,7 @@ Optimization option modified again. Uses ARMv5TE instead of ARM9TDMI.
 * Now in bootlib, Power LED blinks while loading NDS. This will lessen your irritation.
 * Now dscoverloader use loader.cfg instead of loader.ext (let's copy _te to cfg.TextEdit.nds)
 
-100626 Diff
+100626 Diff (0.41a)
 * mshl2wrap.ini / favlauncher.ini.sample updated.
 * inilink supports DEMO/R4DS/_R4i(clone) RPGN/XXXX(AKRPG/+) iTDS/R4_I(not recommended)
 * dscoverloader/loader.nds now depends on /moonshl2/extlink/mshl2wrap.ini. loader.cfg isn't required any longer.
@@ -236,10 +248,356 @@ Optimization option modified again. Uses ARMv5TE instead of ARM9TDMI.
 * Fixed: DefaultDir in iniclear didn't work at all.
 * Recompiled with devkitARMr31. libnds etc were also recompiled.
 
-100725 Diff
+100725 Diff (0.42a)
 * Added g6dsload.eng (only M3iZero) (directly jumps to /moonshl2/reload.dat)
 * Recompiled using libnds 1.4.4
 
-100726 Diff
+100726 Diff (0.42b)
 * Added YSMenu for all flashcart / r4loader extlink(WoodR4 loader).
 * nds.ak2loader.nds gets savename precisely; SFN can be different from nds name.
+
+0.50.100801
+Now mshl2tools can be compiled in both r31 and r23b (Of course, r23b comes without bootstub support).
+Now informations are written both in Main and Sub screen.
+Added M3DS reset.
+
+0.50a.100820
+Updated libnds to 1.4.5.
+Added savbackup. (libprism also updated)
+
+0.51.100823
+Fixed a bug that lower screen didn't work.
+savbackup.ini uses scandir and bakdir. Not compatible with before.
+savbackup writes copy progress to lower screen.
+Now favlauncher.ini/ndslink.ini/savbackup.ini haven't to be in root if launcher supports ARGV.
+ARGV receiving/sending support added.
+
+0.51a.100824
+dldicaptor gets friendlyName more precisely.
+ndslink(both PC and nds app) improved for moonshell2 icon.
+UseAK2_iniclear/UseRPG_iniclear/UseWoodR4_iniclear were added to inilink.ini (only read from iniclear).
+This might be useful for those who want AKAIO extlink but keep YSMenu as primary kernel.
+Well, you might think you can just put YSMenu.nds as kernel, but ini is editable via MoonShell2... For debug :p
+Due to some demands, (though SnemulDS plugin reads only /snemul.cfg) I put a special treatment to savbackup.nds.
+Now it tries /savbackup.ini, /_dstwoplug/savbackup.ini, then the same dir as ARGV[0].
+I'm so annoyed that DSTWO lacks ARGV support. I wish I could remove this treatment.
+Why ndslink doesn't require this treatment? Because unfortunately DSTWO doesn't have any extlinks.
+
+0.51b.100825
+Fixed: I should have added initClockIRQ()...
+Tweaked ARM7 ResetRudolph.
+Clarified noreturn in die().
+Now savbackup compares timestamp in backing up.
+Also you can backup as .sav if scandir and savdir are different.
+
+0.51c.100829
+Fixed: reset_m3 wasn't archived...
+Added reset_r4.
+Updated dldipatch.
+fatx.c now uses open/__get_handle combo rather than direct _FAT_open_r. Much safer.
+
+0.51c1.100829
+Fixed two segmentation faults enbugged in 0.51c. Very sorry.
+
+0.51d.100831
+m3loader supports G003_minigame.* as type=2.
+Searching ini is safer.
+Added linkpath.ini feature to reset_*; If a reset_mse is linked to "ZZZ", it reads {/,/_dstwoplug/}linkpath.ini.
+---
+[linkpath]
+ZZZ=/tool/dldicaptor.nds ;This nds will be launched.
+---
+
+0.51d1.100901
+Fixed favlauncher unstability. There were too many local(stack) strings.
+Fixed a fatal bug in boot.bin enbugged in 0.51.
+
+0.51e.100902
+Now you can specify NDS name for Use*_iniclear.
+Added alternative M3DS dldi(the first dldi whose source is available). Base information is credited to toro.
+inilink / iniclear now support YSMenu on M3 (which uses modified r4patch.dat).
+For detailed information, please see DS Env Maker document.
+
+(not public until 0.60)
+0.51f 100903 alpha
+inilink should use YSM3 config as normal YSMenu cannot be used on M3...
+Merged m3region.
+iniclear/favlauncher: added r4/m3 bootstrap as well as ak2/dsone/dstt/demo.
+Rewritten die() and returning from loader SDK for XenoFile.
+
+0.51g 100903 alpha
+XenoFile: file listing / nds loading / launching texteditor / launching extlink.
+
+0.51h 100904 alpha
+(internal) key getting method changed.
+XenoFile: sav convertion. iterating extlink.
+
+0.51i 100906 alpha
+XenoFile: DLDI switching.
+
+0.51j 100907 alpha
+Put wait to favlauncher.
+Added favlauncher_ms.
+XenoFile: gds convertion.
+
+0.51k 100907 alpha
+Added getFragments().
+XenoFile: context menu.
+
+0.51l 100907 beta
+Xenofile goes to beta phase.
+
+0.51m 100908 beta
+Added showing image support. From now on VRAM_C is used for sub screen.
+Stopped setting VRAM_C in MoonShell Simply Loader.
+
+0.51n 100908 beta
+Added backspace support to console.
+XenoFile: added b15 showing basic support.
+
+0.51o 100909 beta
+keyboard image compression.
+
+0.51p 100909 beta
+XenoFile: added rename, hoorey! No longer need to use unstable DSOrganize!
+Supported lid (now backlight off when lid is closed)
+
+0.51q 100910 beta
+XenoFile: added MD5 calculation.
+
+0.60.100911
+Added XenoFile.
+Added nds_backup_tool_memory.
+
+0.60a.100911
+XenoFile default filter set to all for NDS whose L/R are broken.
+XenoFile/ExtlinkWrapper/m3loader now recognize GBALdr and PPSEDS as homebrew correctly.
+
+0.60b.100911
+Fixed: iniclear for YSMenu didn't work...
+
+0.61.100913 (not public)
+XenoFile now supports swaping microSD. I have got AK2i working on a SD without akmenu4.nds...
+Well, this feature can be used to modify/recover kernel environment without PC.
+Now you can see system and firmware infomation. Y button is assigned to system menu.
+Fixed bootlib.
+Slightly modified moonshellreset.c / ret_menu9_Gens.s to get it work on EZ (and clones such as iSmartDS).
+# MoonShell 2.00beta5 doesn't do IRQ_HANDLER ARM9 things...
+# Still no compatibility with DSLinux...
+
+0.61a.100914 alpha / 0.61b.100915 beta (not public)
+Removed DSONE EOS support because even enterLastDirWhenBoot isn't working (it was undocumented though)
+Very buggy support for DSTWO/iSakuReal added to inilink.
+Really experimental, so avoid if you are n00b.
+This support will be in alpha phase forever, so please be careful to use.
+In short, this feature is only self-satisfaction to buy DSTWO.
+
+The following is the text I copied to warning screen.
+---
+DSTWO support will be in alpha phase forever.
+inilink moves nds to /extlink_eos/ then iniclear moves it back to original folder.
+Of course you have to press nds again in DSTWO.
+Multibyte filename isn't supported.
+Make sure iniclear is set as /_dstwo/dsgame.nds.
+
+Press A to accept (from next time this notice will not be shown).
+Press B to shutdown.
+---
+iSakuReal support will be in alpha phase forever.
+inilink moves nds to /defaulty.nds then iniclear moves it back to original filename.
+Of course you have to hold Y button.
+Multibyte filename isn't supported.
+Make sure iniclear or iSakuReal/M3Sakura/
+MoonShell2 is set as primary kernel.
+If latter, when reseted iniclear copied as /defaultn.nds does things (and erase myself) then poweroff.
+Press A to accept (from next time this notice will not be shown). Press B to shutdown.
+---
+
+0.62.100917 gamma
+Version bump :p
+
+0.63.100918
+Added libprism_[f]utime() to libprism. The first NDS library to change timestamp!
+Added BidirectionalCopy feature to savbackup. You can backup to /save to use in EZ, possibly.
+Added create new file/make directory/change timestamp to XenoFile.
+In XenoFile, pasting(copy) destination will have the same timestamp as source.
+XenoFile now has faster MoonShell2 splash decoder.
+
+0.63a.100919
+Added wait to XenoFile keyrepeat and repeating speed is faster.
+Now lower screen uses the same color as upper. If you want contrast like before, search fe634d6f646501 in hex then modify "01" to "02".
+Now XenoFile stat shows actual file attribute.
+You can toggle showing hidden/system files using X key.
+
+0.63b.100921
+Fixed r4loader for WoodR4 1.13.
+
+0.63b1.100923
+Fixed inilink for WoodR4 1.13(forgot in 0.63b...)
+Added ex4tf.dldi (alternative DLDI which works on R4iLS/EX4DS)
+
+0.63c.100927 (not public)
+Now BootDSBooter() emits correct header CRC16.
+Now XenoFile can enable/disable YSMenu softreset.
+Now XenoFile can show battery state in system info.
+For a reason, m3sakura_boot will modify /system/misakura/dldibody.bin then launch /misakura.nds from now on.
+
+0.64.100928
+Now MoonShell Simply loader can load homebrews whose first 4 bytes aren't \x2E\0\0\xEA such as PPSEDS correctly.
+Added Slot2 NDS / Slot2 GBA feature to XenoFile. /xenogba.b15 is used for gba border. You can generate b15 using png2b15 program.
+
+0.65.100930
+XenoFile/mshl2wrap/dscoverloader/m3loader: Now homebrews are detected more precisely (checks ARM9 offset and ARM7 exec address).
+Now XenoFile can show the NDS type(phat/lite/i).
+XenoFile can show GIF images using /moonshl/plugin/gif.msp
+(very sorry but do not try to open jpg/png, the same issue as MoonShell Simply).
+BMP/ICO are opened using internal libnsbmp decoder.
+*** Showing image is limited to the starting 256x192. Fixme... ***
+XenoFile slot2 GBA now supports /gbaframe.bmp as border (if /xenogba.b15 exists, it is used as before)
+Well this is also a sample implementation for Searinox...
+Added XenoFile G003 bootstrap (g003rest.dat).
+As XenoFile is now too complicated, reverted Makefile to that of mshl2tools 0.4x...
+Added alternative scds.dldi / ttio.dldi.
+This DLDI can change function as to DLDI ID (SCDS or not).
+This ttio.dldi works on SD.
+Also scds.dldi has a feature to bypass the need of ttreset to use YSMenu on DSONEi.
+Due to these useful hack, I have decided to change bootstrap's DLDI to these.
+Now inilink / iniclear can load YSMenu on DSONEi directly using SCDS_SetSDHCModeForDSTT() magic. SCYSMenu setting is removed.
+
+0.65a.101001
+Fixed several bugs which occurred in refactoring for 0.65.
+ndslink improved for Pokemon B/W.
+
+0.65b.101004
+Now XenoFile can fix NDS header and encrypt/decrypt secure area.
+
+0.65b1.101005
+Fixed a fatal bug that secure area encryption key grabbing was wrong.
+
+0.65c.101008
+Making argv fixed.
+Now XenoFile can use /__rpg/rpglink.nds as loader plugin (workaround for dslinux)
+XenoFile splash viewing handler now supports iSakuReal and M3Sakura.
+
+0.66.101010 #See the number sequence!
+inilink/iniclear now support iSmartDS FishShell2. Of course you have to set ismat.dat to iniclear.
+---
+iSmartDS support will be in alpha phase forever.
+inilink moves nds to /defaultn.nds then iniclear moves it back to original filename.
+Multibyte filename isn't supported.
+Make sure iniclear is set as /system/ismat.dat.
+
+Press A to accept (from next time this notice will not be shown).
+Press B to shutdown.
+---
+
+0.66a.101013
+Fixed last cluster bug again. Users should update immediately.
+XenoFile shows time in system info.
+
+0.66b.101018
+inilink.ini sample fixed for woodr4sdhc.
+inilink works for AKAIO 1.8.1.
+iniclear is now in debug mode. I need more tests to get DSTWO support correctly?
+
+0.67.101021
+XenoFile now supports .u8m
+XenoFile now supports playing music files using msp.
+But m4a/ogg have glitches lol
+
+0.68.101021
+Updated to devkitARM r32 / libnds 1.4.8 / libfat r4416.
+Now I think -O2 is enough other than DLDI... XenoFile -20KB.
+Now that inilink has too many warning screens, it uses lzma to decode them.
+
+0.68a.101022 (not public)
+savbackup now searches /ismartplug/ for savbackup.ini. Why don't they add ARGV support?
+Added iply.dldi.
+Highly optimized DLDIs.
+
+0.68b.101025
+Fixed a fatal bug in DLDI enbugged in 0.68a lol
+
+0.70.101029
+nds.r4loader.nds can handle /__rpg/cheats/usrcheat.dat (Killed compatibility with under 1.15)
+nds.r4loader.nds is configurable via /__rpg/woodload.ini.
+nds.r4loader.nds is no longer beta...
+I hope nds.ak2loader.nds can handle softreset.
+nds.ak2loader.nds can decrypt 1.6RC2 internally again.
+Now MoonShell Simply loader can handle NDS whose code size is <=2MB. Safe for NitroFS homebrews.
+Added YSMenu with WoodEngine. Put woodload as /YSMenu/woodload.nds then boot yswood.nds.
+# The difference between ysall+r4loader combo and yswood is that you can configure cheat inside YSMenu!
+YSMenu for all flashcart and YSMenu with WoodEngine read /moonshl2/extlink/inilink.ini to determine YSMenu.nds path,
+if it isn't /YSMenu/YSmenu.nds.
+
+0.70a.101031
+Added g003.dldi (will corrupt your TF though lol)
+Added demo.dldi (the same as ttio.dldi)
+Optimized DLDIs again (put static inline to all functions other than exports)
+Now inilink supports DSOneEOS and iSmartMultiMedia in a very dirty way. More buggy than DSTWO support!
+Refrain from it (though I have tested on my iSmartMultiMedia)...
+# Current DSTWO users have to write "DSTwoDir=/_dstwo/" to inilink.ini. Sorry.
+Now XenoFile can touch file and change file attribute (only ReadOnly/Hidden/System).
+Made sample mshl2wrap.ini better.
+---
+DSONE EOS support will be in alpha phase forever.
+inilink moves nds to /!!!extlink/ then iniclear moves it back to original folder.
+Of course you have to select nds again (only a few key input!) in EOS.
+Multibyte filename isn't supported.
+Make sure iniclear is set as /scfw.sc.
+
+Press A to accept (from next time this notice will not be shown).
+Press B to shutdown.
+---
+DSTWO/iSMM EOS support will be in alpha phase forever.
+inilink moves nds to /!!!extlink/ then iniclear moves it back to original folder.
+Of course you have to select nds again (only a few key input!) in DSTWO/iSMM.
+Multibyte filename isn't supported.
+Make sure iniclear is set as /_dstwo/dsgame.nds or /_ismart/dsgame.nds.
+
+Press A to accept (from next time this notice will not be shown).
+Press B to shutdown.
+---
+
+0.70b.101101
+Fixed a severe bug that files created newly get readonly/hidden/system (enbugged in updating libfat).
+Now XenoFile can dump /biosnds7.rom, /biosnds9.rom and /FWxxxxxxxxxxxx.bin.
+Now XenoFile shows MAC address in system info.
+Now XenoFile can go to NDS(L) firmware like YSMenu (if FW is 256KB...).
+#This implemetation is based on desmume. So if you want to get GPL free version, recompile without -DGPL.
+
+0.70c.101104
+Fixed a fatal bug that time isn't updated after being launched. (won't affect other than XenoFile because they are just batch thing)
+Now XenoFile can show M3Region...
+Added several bootstraps, especially g003 and ezvi...
+---
+EZVi support will be in alpha phase forever.
+inilink moves nds to /!!!extlink/ then iniclear moves it back to original folder.
+Of course you have to select nds again (only a few key input!) in EZVi.
+Multibyte filename isn't supported.
+Make sure iniclear is set as /ez5sys.bin or /ez5isys.bin.
+
+Press A to accept (from next time this notice will not be shown).
+Press B to shutdown.
+---
+
+0.70d.101105
+Now XenoFile can show Firmware Version and Temperature.
+Return to NDS(L) firmware supports 512KB (I hope).
+Fixed several warnings.
+
+0.70d1.101105
+Now XenoFile can return to DSi menu when you select "Return to NDS firmware".
+
+0.70e.101107
+Recompiled as stable...
+
+0.70f.101118
+XenoFile can "Run as homebrew after swapping flashcart" (half joking... tests didn't work).
+Better dumping firmware (using malloc).
+Can detect Korean Firmware.
+Shows firmware size in system info.
+
+0.70g.101216 Final
+Now XenoFile can test microSD speed. (half joking)
+Updated libfat and libnds (only in r32 version)

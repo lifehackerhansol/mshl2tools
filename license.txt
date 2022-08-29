@@ -1,6 +1,7 @@
 MoonShell2Tools License Term
 
-1. The loader SDK(arm7/IPCZ) and mkpath()/rm_rf()/die() are under CC0.
+0. minIni is ITB CompuPhase's copyrighted library under Apache License 2.0 (http://www.apache.org/licenses/LICENSE-2.0, BSDL like).
+1. The loader SDK(arm7/IPCZ) and libprism are under CC0.
 2. main.c is samples of how to use loader SDK in your application. Refering it can be done under CC0 but using whole thing has to be done under 2-clause BSDL.
 3. 2nd condition means distributions which include my binaries have to mention my name.
 
