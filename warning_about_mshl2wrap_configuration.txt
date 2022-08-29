@@ -1,0 +1,6 @@
+As long as you use ndslink, do not put nds.*.nds in /moonshl2/extlink.
+If you want you can put nds.mshl2wrap.nds, but please note with this method you cannot use other launchers such as M3Sakura DLDI.
+You can configure what loader you use by modifying /moonshl2/extlink/mshl2wrap.ini, but loaders have to be put into other than /moonshl2/extlink.
+
+I will not accept any questions if your environment doesn't meet this rule.
+In the future I might make Link Launcher halts if the environment doesn't meet the rule.

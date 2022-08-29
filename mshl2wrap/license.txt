@@ -1,0 +1,4 @@
+ndslink.exe: Creative Commons CC0
+
+mshl2wrap/source/arm9/minIni.*: Apache License 2.0
+others: Creative Commons CC0

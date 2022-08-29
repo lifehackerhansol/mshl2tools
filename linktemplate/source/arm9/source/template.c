@@ -1,0 +1,1 @@
+main(){volatile char s[768]="mshl2wrap link template";}
