@@ -222,6 +222,7 @@ bool _FAT_directory_entryGetAlias (const u8* entryData, char* destName) {
 			for (i = 0; (i < 8) && (entryData[DIR_ENTRY_name + i] != ' '); i++) {
 				destName[i] = entryData[DIR_ENTRY_name + i];
 			}
+			if(destName[0]==0x05)destName[0]=0xe5; ///
 			// Copy the extension from the dirEntry to the string
 			if (entryData[DIR_ENTRY_extension] != ' ') {
 				destName[i++] = '.';
@@ -251,7 +252,7 @@ static bool _FAT_directory_incrementDirEntryPosition (PARTITION* partition, DIR_
 
 	// Increment offset, wrapping at the end of a sector
 	++ position.offset;
-	if (position.offset == BYTES_PER_READ / DIR_ENTRY_DATA_SIZE) {
+	if (position.offset == partition->bytesPerSector / DIR_ENTRY_DATA_SIZE) {
 		position.offset = 0;
 		// Increment sector when wrapping
 		++ position.sector;
@@ -369,6 +370,55 @@ bool _FAT_directory_getNextEntry (PARTITION* partition, DIR_ENTRY* entry) {
 			} else {
 				entryStart = entryEnd;
 				_FAT_directory_entryGetAlias (entryData, entry->filename);
+		///let's treat entry->filename
+		bool NTF_lowfn=false,NTF_lowext=false;
+		//must consider LFN (from MoonShell2.00beta5 source)
+		if(entryData[DIR_ENTRY_reserved]&BIT(3)) NTF_lowfn=true;
+		if(entryData[DIR_ENTRY_reserved]&BIT(4)) NTF_lowext=true;
+
+		if((NTF_lowfn==false)&&(NTF_lowext==false)){
+			; //use alias as filename
+		}else{
+			u32 posperiod=(u32)-1;
+			{
+				u32 idx;
+				for(idx=0;idx<MAX_FILENAME_LENGTH;idx++){
+					char fc=entry->filename[idx];
+					if(fc=='.') posperiod=idx;
+					if(fc==0) break;
+				}
+			}
+			if(posperiod==(u32)-1){ //without ext
+				u32 idx;
+				for(idx=0;idx<MAX_FILENAME_LENGTH;idx++){
+					char fc=entry->filename[idx];
+					if(NTF_lowfn==true){
+						if(('A'<=fc)&&(fc<='Z')) fc+=0x20;
+					}
+					entry->filename[idx]=fc;
+					if(fc==0) break;
+				}
+			}else{
+				u32 idx;
+				for(idx=0;idx<MAX_FILENAME_LENGTH;idx++){
+					char fc=entry->filename[idx];
+					if(NTF_lowfn==true){
+						if(('A'<=fc)&&(fc<='Z')) fc+=0x20;
+					}
+					entry->filename[idx]=fc;
+					if(fc=='.') break;
+				}
+				for(;idx<MAX_FILENAME_LENGTH;idx++){
+					char fc=entry->filename[idx];
+					if(NTF_lowext==true){
+						if(('A'<=fc)&&(fc<='Z')) fc+=0x20;
+            				}
+					entry->filename[idx]=fc;
+					if(fc==0) break;
+				}
+			}
+		}
+		///
 			}
 			found = true;
 		}
@@ -450,6 +500,7 @@ bool _FAT_directory_getVolumeLabel (PARTITION* partition, char *label) {
 			for (i = 0; i < 11; i++) {
 				label[i] = entryData[DIR_ENTRY_name + i];				
 			}
+			if(label[0]==0x05)label[0]=0xe5; ///
 			return true;
 		} else if (entryData[0] == DIR_ENTRY_LAST) {
 			end = true;
@@ -998,6 +1049,7 @@ bool _FAT_directory_addEntry (PARTITION* partition, DIR_ENTRY* entry, uint32_t d
 		for (i = 0, j = 0; (j < 8) && (alias[i] != '.') && (alias[i] != '\0'); i++, j++) {
 			entry->entryData[j] = alias[i];
 		}
+		if(entry->entryData[0]==0xe5)entry->entryData[0]=0x05; ///
 		while (j < 8) {
 			entry->entryData[j] = ' ';
 			++ j;
@@ -1102,7 +1154,7 @@ void _FAT_directory_entryStat (PARTITION* partition, DIR_ENTRY* entry, struct st
 		0,
 		u8array_to_u16 (entry->entryData, DIR_ENTRY_aDate)
 	);
-	st->st_spare1 = 0;
+	st->st_spare1 = entry->entryData[DIR_ENTRY_attributes];
 	st->st_mtime = _FAT_filetime_to_time_t (
 		u8array_to_u16 (entry->entryData, DIR_ENTRY_mTime),
 		u8array_to_u16 (entry->entryData, DIR_ENTRY_mDate)
@@ -1113,8 +1165,8 @@ void _FAT_directory_entryStat (PARTITION* partition, DIR_ENTRY* entry, struct st
 		u8array_to_u16 (entry->entryData, DIR_ENTRY_cDate)
 	);
 	st->st_spare3 = 0;
-	st->st_blksize = BYTES_PER_READ;				// Prefered file I/O block size 
-	st->st_blocks = (st->st_size + BYTES_PER_READ - 1) / BYTES_PER_READ;	// File size in blocks
+	st->st_blksize = partition->bytesPerSector;				// Prefered file I/O block size 
+	st->st_blocks = (st->st_size + partition->bytesPerSector - 1) / partition->bytesPerSector;	// File size in blocks
 	st->st_spare4[0] = 0;
 	st->st_spare4[1] = 0;
 }

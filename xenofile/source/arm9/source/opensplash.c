@@ -66,7 +66,7 @@ int zlib_compress(const void *decompbuf, const u32 decompsize, void *compbuf, co
 			return(-1);
 		}
 		if(z.avail_out == 0){
-			_consolePrintf2("inflate buffer overflow.\n");
+			_consolePrint2("inflate buffer overflow.\n");
 			return(-1);
 		}
 	}

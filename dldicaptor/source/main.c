@@ -17,12 +17,12 @@ void Main(){
 		_consolePrintf("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
 	}
 
-	_consolePrintf("Initializing libfat... ");
-	if(!fatInitDefault()){_consolePrintf("Failed.\n");die();}
-	_consolePrintf("Done.\n");
+	_consolePrint("Initializing FAT... ");
+	if(!disc_mount()){_consolePrint("Failed.\n");die();}
+	_consolePrint("Done.\n");
 
 	// vvvvvvvvvvv add 2008.03.30 kzat3
-	_consolePrintf("Capturing DLDI...\n");
+	_consolePrint("Capturing DLDI...\n");
 {
 	char dldiname[768];
 	strcpy(dldiname,"/");
@@ -33,10 +33,12 @@ void Main(){
 	for(;i<strlen(friendlyname);i++)
 		if(0x20<=friendlyname[i] && friendlyname[i]<0x7f && !strchr("\\/:*?\"<>|",friendlyname[i]))
 			*pname++=friendlyname[i];
+		else
+			*pname++='_';
 	strcpy(pname,".dldi");
 	dldi2(NULL,0,0,dldiname);
 }
-	_consolePrintf("DLDI Extraction proceeded (see log for result).\n");die();
+	_consolePrint("DLDI Extraction proceeded (see log for result).\n");die();
 
 	// ^^^^^^^^^^^^ add 2008.03.30 kzat3
 }

@@ -29,7 +29,6 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
-#define BYTES_PER_READ 512
 #include <fat.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -67,7 +66,7 @@
    #define USE_LWP_LOCK
    #define USE_RTC_TIME
 #elif defined (NDS)
-   #define DEFAULT_CACHE_PAGES 4
+   #define DEFAULT_CACHE_PAGES 16
    #define DEFAULT_SECTORS_PAGE 8
    #define USE_RTC_TIME
 #elif defined (GBA)

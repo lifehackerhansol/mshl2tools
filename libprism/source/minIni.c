@@ -3,7 +3,7 @@
  *  These routines are in part based on the article "Multiplatform .INI Files"
  *  by Joseph J. Graf in the March 1994 issue of Dr. Dobb's Journal.
  *
- *  Copyright (c) ITB CompuPhase, 2008-2009
+ *  Copyright (c) ITB CompuPhase, 2008-2011
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not
  *  use this file except in compliance with the License. You may obtain a copy
@@ -20,7 +20,7 @@
  *  Version: $Id: minIni.c 24 2009-05-06 08:01:53Z thiadmer.riemersma $
  */
 
-#include "libprism.h"
+#include "../include/minIni.h"
 #define NDEBUG
 
 #if (defined _UNICODE || defined __UNICODE__ || defined UNICODE) && !defined MININI_ANSI
@@ -39,18 +39,22 @@
 #endif
 
 #if !defined __T
-  /* definition of TCHAR already in minIni.h */
+  #include <ctype.h>
+  #include <string.h>
+  #include <stdlib.h>
+  /* definition of CHAR already in minIni.h */
   #define __T(s)    s
   #define _tcscat   strcat
   #define _tcschr   strchr
   #define _tcscmp   strcmp
   #define _tcscpy   strcpy
-  #define _tcsicmp  stricmp
   #define _tcslen   strlen
   #define _tcsncpy  strncpy
-  #define _tcsnicmp strnicmp
   #define _tcsrchr  strrchr
   #define _tcstol   strtol
+  #define _tcstod   strtod
+  #define _totupper toupper
+  #define _stprintf sprintf
   #define _tfgets   fgets
   #define _tfputs   fputs
   #define _tfopen   fopen
@@ -58,24 +62,24 @@
   #define _trename  rename
 #endif
 
-#if defined __linux || defined __linux__
-  #define __LINUX__
-#endif
-#if defined FREEBSD && !defined __FreeBSD__
-  #define __FreeBSD__
-#endif
-#if !defined strnicmp
-  #if defined __LINUX__ || defined __FreeBSD__ || defined __OpenBSD__
-    #define strnicmp  strncasecmp
-  #endif
+#if defined(WIN32) || (!defined(__GNUC__) && !defined(__clang__))
+  #define _tcsicmp  stricmp
+  #define _tcsnicmp strnicmp
+#else
+  #define _tcsicmp  strcasecmp
+  #define _tcsnicmp strncasecmp
 #endif
 
-#if !defined INI_LINETERM
-  #define INI_LINETERM    __T("\n")
-#endif
+//#if !defined INI_LINETERM
+//  #define INI_LINETERM    __T("\n")
+//#endif
 #if !defined INI_FILETYPE
   #define INI_FILETYPE    FILE*
 #endif
+
+CHAR *INI_LINETERM;
+#define LF __T("\n")
+#define CRLF __T("\r\n")
 
 #if !defined sizearray
   #define sizearray(a)    (sizeof(a) / sizeof((a)[0]))
@@ -87,34 +91,34 @@ enum quote_option {
   QUOTE_DEQUOTE,
 };
 
-static TCHAR *skipleading(const TCHAR *str)
+static CHAR *skipleading(const CHAR *str)
 {
   assert(str != NULL);
   while (*str != '\0' && *str <= ' ')
     str++;
-  return (TCHAR *)str;
+  return (CHAR *)str;
 }
 
-static TCHAR *skiptrailing(const TCHAR *str, const TCHAR *base)
+static CHAR *skiptrailing(const CHAR *str, const CHAR *base)
 {
   assert(str != NULL);
   assert(base != NULL);
   while (str > base && *(str-1) <= ' ')
     str--;
-  return (TCHAR *)str;
+  return (CHAR *)str;
 }
 
-static TCHAR *striptrailing(TCHAR *str)
+static CHAR *striptrailing(CHAR *str)
 {
-  TCHAR *ptr = skiptrailing(_tcschr(str, '\0'), str);
+  CHAR *ptr = skiptrailing(_tcschr(str, '\0'), str);
   assert(ptr != NULL);
   *ptr='\0';
   return str;
 }
 
-static TCHAR *save_strncpy(TCHAR *dest, const TCHAR *source, size_t maxlen, enum quote_option option)
+static CHAR *save_strncpy(CHAR *dest, const CHAR *source, size_t maxlen, enum quote_option option)
 {
-  int d, s;
+  size_t d, s;
 
   assert(maxlen>0);
   if (option == QUOTE_ENQUOTE && maxlen < 3)
@@ -154,12 +158,13 @@ static TCHAR *save_strncpy(TCHAR *dest, const TCHAR *source, size_t maxlen, enum
   return dest;
 }
 
-static int getkeystring(INI_FILETYPE *fp, const TCHAR *Section, const TCHAR *Key,
-                        int idxSection, int idxKey, TCHAR *Buffer, int BufferSize)
+static int getkeystring(INI_FILETYPE *fp, const CHAR *Section, const CHAR *Key,
+                        int idxSection, int idxKey, CHAR *Buffer, int BufferSize)
 {
-  TCHAR *sp, *ep;
-  int len, idx, isstring;
-  TCHAR LocalBuffer[INI_BUFFERSIZE];
+  CHAR *sp, *ep;
+  int len, idx, isstring=0;
+  enum quote_option quotes;
+  CHAR LocalBuffer[INI_BUFFERSIZE];
 
   assert(fp != NULL);
   /* Move through file 1 line at a time until a section is matched or EOF. If
@@ -233,13 +238,13 @@ static int getkeystring(INI_FILETYPE *fp, const TCHAR *Section, const TCHAR *Key
   *ep = '\0';                 /* terminate at a comment */
   striptrailing(sp);
   /* Remove double quotes surrounding a value */
-  isstring = QUOTE_NONE;
+  quotes = QUOTE_NONE;
   if (*sp == '"' && (ep = _tcschr(sp, '\0')) != NULL && *(ep - 1) == '"') {
     sp++;
     *--ep = '\0';
-    isstring = QUOTE_DEQUOTE; /* this is a string, so remove escaped characters */
+    quotes = QUOTE_DEQUOTE; /* this is a string, so remove escaped characters */
   } /* if */
-  save_strncpy(Buffer, sp, BufferSize, isstring);
+  save_strncpy(Buffer, sp, BufferSize, quotes);
   return 1;
 }
 
@@ -253,8 +258,8 @@ static int getkeystring(INI_FILETYPE *fp, const TCHAR *Section, const TCHAR *Key
  *
  * \return            the number of characters copied into the supplied buffer
  */
-int ini_gets(const TCHAR *Section, const TCHAR *Key, const TCHAR *DefValue,
-             TCHAR *Buffer, int BufferSize, const TCHAR *Filename)
+int ini_gets(const CHAR *Section, const CHAR *Key, const CHAR *DefValue,
+             CHAR *Buffer, int BufferSize, const CHAR *Filename)
 {
   INI_FILETYPE fp;
   int ok = 0;
@@ -278,11 +283,77 @@ int ini_gets(const TCHAR *Section, const TCHAR *Key, const TCHAR *DefValue,
  *
  * \return            the value located at Key
  */
-long ini_getl(const TCHAR *Section, const TCHAR *Key, long DefValue, const TCHAR *Filename)
+long ini_getl(const CHAR *Section, const CHAR *Key, long DefValue, const CHAR *Filename)
 {
-  TCHAR buff[64];
+  CHAR buff[64];
   int len = ini_gets(Section, Key, __T(""), buff, sizearray(buff), Filename);
   return (len == 0) ? DefValue : _tcstol(buff,NULL,10);
+}
+
+/** ini_getf()
+ * \param Section     the name of the section to search for
+ * \param Key         the name of the entry to find the value of
+ * \param DefValue    the default value in the event of a failed read
+ * \param Filename    the name of the .ini file to read from
+ *
+ * \return            the value located at Key
+ */
+double ini_getf(const CHAR *Section, const CHAR *Key, double DefValue, const CHAR *Filename)
+{
+  CHAR buff[64];
+  int len = ini_gets(Section, Key, __T(""), buff, sizearray(buff), Filename);
+  return (len == 0) ? DefValue : _tcstod(buff,NULL);
+}
+
+/** ini_getbool()
+ * \param Section     the name of the section to search for
+ * \param Key         the name of the entry to find the value of
+ * \param DefValue    default value in the event of a failed read; it should
+ *                    zero (0) or one (1).
+ * \param Buffer      a pointer to the buffer to copy into
+ * \param BufferSize  the maximum number of characters to copy
+ * \param Filename    the name and full path of the .ini file to read from
+ *
+ A true boolean is found if one of the following is matched:
+
+  - A string starting with 'y'
+  - A string starting with 'Y'
+  - A string starting with 't'
+  - A string starting with 'T'
+  - A string starting with '1'
+
+  A false boolean is found if one of the following is matched:
+
+  - A string starting with 'n'
+  - A string starting with 'N'
+  - A string starting with 'f'
+  - A string starting with 'F'
+  - A string starting with '0'
+ *
+ * \return            the true/false flag as interpreted at Key
+ */
+int ini_getbool(const CHAR *Section, const CHAR *Key, int DefValue, const CHAR *Filename)
+{
+  CHAR buff[2];
+  //int ret;
+
+  ini_gets(Section, Key, __T(""), buff, sizearray(buff), Filename);
+/*
+  buff[0] = toupper(buff[0]);
+  if (buff[0]=='Y' || buff[0]=='1' || buff[0]=='T')
+    ret = 1;
+  else if (buff[0]=='N' || buff[0]=='0' || buff[0]=='F')
+    ret = 0;
+  else
+    ret = DefValue;
+
+  return(ret);
+*/
+	switch(buff[0]){
+		case 'y': case 'Y': case 't': case 'T': case '1': return 1;
+		case 'n': case 'N': case 'f': case 'F': case '0': return 0;
+	}
+	return !!DefValue;
 }
 
 /** ini_getsection()
@@ -293,7 +364,7 @@ long ini_getl(const TCHAR *Section, const TCHAR *Key, long DefValue, const TCHAR
  *
  * \return            the number of characters copied into the supplied buffer
  */
-int  ini_getsection(int idx, TCHAR *Buffer, int BufferSize, const TCHAR *Filename)
+int  ini_getsection(int idx, CHAR *Buffer, int BufferSize, const CHAR *Filename)
 {
   INI_FILETYPE fp;
   int ok = 0;
@@ -319,7 +390,7 @@ int  ini_getsection(int idx, TCHAR *Buffer, int BufferSize, const TCHAR *Filenam
  *
  * \return            the number of characters copied into the supplied buffer
  */
-int  ini_getkey(const TCHAR *Section, int idx, TCHAR *Buffer, int BufferSize, const TCHAR *Filename)
+int  ini_getkey(const CHAR *Section, int idx, CHAR *Buffer, int BufferSize, const CHAR *Filename)
 {
   INI_FILETYPE fp;
   int ok = 0;
@@ -337,9 +408,9 @@ int  ini_getkey(const TCHAR *Section, int idx, TCHAR *Buffer, int BufferSize, co
 
 
 #if ! defined INI_READONLY
-static void ini_tempname(TCHAR *dest, const TCHAR *source, int maxlength)
+static void ini_tempname(CHAR *dest, const CHAR *source, int maxlength)
 {
-  TCHAR *p;
+  CHAR *p;
 
   save_strncpy(dest, source, maxlength, QUOTE_NONE);
   p = _tcsrchr(dest, '\0');
@@ -347,9 +418,9 @@ static void ini_tempname(TCHAR *dest, const TCHAR *source, int maxlength)
   *(p - 1) = '~';
 }
 
-static enum quote_option check_enquote(const TCHAR *Value)
+static enum quote_option check_enquote(const CHAR *Value)
 {
-  const TCHAR *p;
+  const CHAR *p;
 
   /* run through the value, if it has trailing spaces, or '"', ';' or '#'
    * characters, enquote it
@@ -360,9 +431,9 @@ static enum quote_option check_enquote(const TCHAR *Value)
   return (*p != '\0' || (p > Value && *(p - 1) == ' ')) ? QUOTE_ENQUOTE : QUOTE_NONE;
 }
 
-static void writesection(TCHAR *LocalBuffer, const TCHAR *Section, INI_FILETYPE *fp)
+static void writesection(CHAR *LocalBuffer, const CHAR *Section, INI_FILETYPE *fp)
 {
-  TCHAR *p;
+  CHAR *p;
 
   if (Section != NULL && _tcslen(Section) > 0) {
     LocalBuffer[0] = '[';
@@ -375,9 +446,9 @@ static void writesection(TCHAR *LocalBuffer, const TCHAR *Section, INI_FILETYPE 
   } /* if */
 }
 
-static void writekey(TCHAR *LocalBuffer, const TCHAR *Key, const TCHAR *Value, INI_FILETYPE *fp)
+static void writekey(CHAR *LocalBuffer, const CHAR *Key, const CHAR *Value, INI_FILETYPE *fp)
 {
-  TCHAR *p;
+  CHAR *p;
   enum quote_option option = check_enquote(Value);
   save_strncpy(LocalBuffer, Key, INI_BUFFERSIZE - 3, QUOTE_NONE);  /* -1 for '=', -2 for '\r\n' */
   p = _tcsrchr(LocalBuffer, '\0');
@@ -390,9 +461,9 @@ static void writekey(TCHAR *LocalBuffer, const TCHAR *Key, const TCHAR *Value, I
   ini_write(LocalBuffer, fp);
 }
 
-static void write_quoted(const TCHAR *Value, INI_FILETYPE *fp)
+static void write_quoted(const CHAR *Value, INI_FILETYPE *fp)
 {
-  TCHAR s[3];
+  CHAR s[3];
   int idx;
   if (check_enquote(Value) == QUOTE_NONE) {
     ini_write(Value, fp);
@@ -421,15 +492,16 @@ static void write_quoted(const TCHAR *Value, INI_FILETYPE *fp)
  *
  * \return            1 if successful, otherwise 0
  */
-int ini_puts(const TCHAR *Section, const TCHAR *Key, const TCHAR *Value, const TCHAR *Filename)
+int ini_puts(const CHAR *Section, const CHAR *Key, const CHAR *Value, const CHAR *Filename)
 {
   INI_FILETYPE rfp;
   INI_FILETYPE wfp;
-  TCHAR *sp, *ep;
-  TCHAR LocalBuffer[INI_BUFFERSIZE];
+  CHAR *sp, *ep;
+  CHAR LocalBuffer[INI_BUFFERSIZE];
   int len, match, count;
 
   assert(Filename!=NULL);
+  INI_LINETERM=LF;
   if (!ini_openread(Filename, &rfp)) {
     /* If the .ini file doesn't exist, make a new file */
     if (Key!=NULL && Value!=NULL) {
@@ -442,6 +514,10 @@ int ini_puts(const TCHAR *Section, const TCHAR *Key, const TCHAR *Value, const T
     return 1;
   } /* if */
 
+  memset(LocalBuffer,0,sizeof(LocalBuffer));
+  ini_read(LocalBuffer,INI_BUFFERSIZE,&rfp);
+  if(_tcslen(LocalBuffer)>1&&LocalBuffer[_tcslen(LocalBuffer)-2]=='\r')INI_LINETERM=CRLF;
+  ini_rewind(&rfp);
   /* If parameters Key and Value are valid (so this is not an "erase" request)
    * and the setting already exists and it already has the correct value, do
    * nothing. This early bail-out avoids rewriting the INI file for no reason.
@@ -550,7 +626,8 @@ int ini_puts(const TCHAR *Section, const TCHAR *Key, const TCHAR *Value, const T
       ini_write(Key, &wfp);
       ini_write("=", &wfp);
       write_quoted(Value, &wfp);
-      ini_write(INI_LINETERM INI_LINETERM, &wfp); /* put a blank line between the current and the next section */
+      ini_write(INI_LINETERM, &wfp); /* put a blank line between the current and the next section */
+      ini_write(INI_LINETERM, &wfp);
     } /* if */
     /* write the new section header that we read previously */
     ini_write(sp, &wfp);
@@ -582,9 +659,9 @@ int ini_puts(const TCHAR *Section, const TCHAR *Key, const TCHAR *Value, const T
 /* Ansi C "itoa" based on Kernighan & Ritchie's "Ansi C" book. */
 #define ABS(v)  ((v) < 0 ? -(v) : (v))
 
-static void strreverse(TCHAR *str)
+static void strreverse(CHAR *str)
 {
-  TCHAR t;
+  CHAR t;
   int i, j;
 
   for (i = 0, j = _tcslen(str) - 1; i < j; i++, j--) {
@@ -594,7 +671,7 @@ static void strreverse(TCHAR *str)
   } /* for */
 }
 
-static void long2str(long value, TCHAR *str)
+static void long2str(long value, CHAR *str)
 {
   int i = 0;
   long sign = value;
@@ -603,7 +680,7 @@ static void long2str(long value, TCHAR *str)
   /* generate digits in reverse order */
   do {
     n = (int)(value % 10);              /* get next lowest digit */
-    str[i++] = (TCHAR)(ABS(n) + '0');   /* handle case of negative digit */
+    str[i++] = (CHAR)(ABS(n) + '0');   /* handle case of negative digit */
   } while (value /= 10);                /* delete the lowest digit */
   if (sign < 0)
     str[i++] = '-';
@@ -614,31 +691,46 @@ static void long2str(long value, TCHAR *str)
 
 /** ini_putl()
  * \param Section     the name of the section to write the value in
- * \param Key         the name of the entry to write, or NULL to erase all keys in the section
+ * \param Key         the name of the entry to write
  * \param Value       the value to write
  * \param Filename    the name and full path of the .ini file to write to
  *
  * \return            1 if successful, otherwise 0
  */
-int ini_putl(const TCHAR *Section, const TCHAR *Key, long Value, const TCHAR *Filename)
+int ini_putl(const CHAR *Section, const CHAR *Key, long Value, const CHAR *Filename)
 {
-  TCHAR str[32];
-  long2str(Value, str);
-  return ini_puts(Section, Key, str, Filename);
+  CHAR buff[32];
+  long2str(Value, buff);
+  return ini_puts(Section, Key, buff, Filename);
+}
+
+/** ini_putf()
+ * \param Section     the name of the section to write the value in
+ * \param Key         the name of the entry to write
+ * \param Value       the value to write
+ * \param Filename    the name and full path of the .ini file to write to
+ *
+ * \return            1 if successful, otherwise 0
+ */
+int ini_putf(const CHAR *Section, const CHAR *Key, double Value, const CHAR *Filename)
+{
+  CHAR buff[64];
+  _stprintf(buff, __T("%lf"), Value);
+  return ini_puts(Section, Key, buff, Filename);
 }
 #endif /* !INI_READONLY */
 
 
 #if defined PORTABLE_STRNICMP
-int strnicmp(const TCHAR *s1, const TCHAR *s2, size_t n)
+int strnicmp(const CHAR *s1, const CHAR *s2, size_t n)
 {
-  register unsigned TCHAR c1, c2;
+  register unsigned CHAR c1, c2;
 
   while (n-- != 0 && (*s1 || *s2)) {
-    c1 = *(const unsigned TCHAR *)s1++;
+    c1 = *(const unsigned CHAR *)s1++;
     if ('a' <= c1 && c1 <= 'z')
       c1 += ('A' - 'a');
-    c2 = *(const unsigned TCHAR *)s2++;
+    c2 = *(const unsigned CHAR *)s2++;
     if ('a' <= c2 && c2 <= 'z')
       c2 += ('A' - 'a');
     if (c1 != c2)

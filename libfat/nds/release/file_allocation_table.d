@@ -10,7 +10,8 @@ file_allocation_table.o: \
  /opt/mshl2tools/r32/libfat/nds/../source/partition.h \
  /opt/mshl2tools/r32/libfat/nds/../source/cache.h \
  /opt/mshl2tools/r32/libfat/nds/../source/disc.h \
- /opt/mshl2tools/r32/libfat/nds/../source/lock.h
+ /opt/mshl2tools/r32/libfat/nds/../source/lock.h \
+ /opt/mshl2tools/r32/libfat/nds/../source/mem_allocate.h
 
 /opt/mshl2tools/r32/libfat/nds/../source/file_allocation_table.h:
 
@@ -33,3 +34,5 @@ file_allocation_table.o: \
 /opt/mshl2tools/r32/libfat/nds/../source/disc.h:
 
 /opt/mshl2tools/r32/libfat/nds/../source/lock.h:
+
+/opt/mshl2tools/r32/libfat/nds/../source/mem_allocate.h:

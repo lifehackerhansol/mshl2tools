@@ -55,6 +55,14 @@ static u8 row, col;
 
 static volatile u32 stNullChar=0;
 
+char console_strbuf[2048];
+type_charp consolePrint_callback;
+type_charp consolePrintOnce_callback;
+type_charp_u32_u32 consolePrintProgress_callback;
+type_void consoleClear_callback;
+type_void consolePrintOnceEnd_callback;
+type_void consoleStartProgress_callback;
+type_void consoleEndProgress_callback;
 
 ///////////////////////////////////////////////////////////
 //consoleInit
@@ -85,6 +93,7 @@ void _consoleInitDefault(u16* map, u16* charBase) {
 	_consoleInit256((u16*)_console_font_fixed6x6_bin, charBase, 256, map);
 }
 
+/*
 void _consolePrintSet(int x, int y) {
 	if(y < CONSOLE_HEIGHT)
 		row = y;
@@ -101,6 +110,7 @@ int _consoleGetPrintSetY(void)
 {
   return(row);
 }
+*/
 
 void _consolePrintChar(char c) {
 	int rowup=0;
@@ -182,25 +192,71 @@ void _consolePrintChar(char c) {
 
 void _consolePrint(const char* s)
 {
+  if(consolePrint_callback){consolePrint_callback(s);return;}
   while(*s!=0){
     _consolePrintChar(*s);
     s++;
   }
 }
 
-static char strbuf[1024];
 void _consolePrintf(const char* format, ...)
 {
   va_list args;
   
   va_start( args, format );
-  vsprintf( strbuf, format, args );
-  _consolePrint(strbuf);
+  vsprintf( console_strbuf, format, args );
+  _consolePrint(console_strbuf);
   va_end(args);
+}
+
+void _consolePrintOnce(const char* s)
+{
+  if(consolePrintOnce_callback){consolePrintOnce_callback(s);return;}
+  while(*s!=0){
+    _consolePrintChar(*s);
+    s++;
+  }
+  _consolePrintChar('\r');
+}
+
+void _consolePrintfOnce(const char* format, ...)
+{
+  va_list args;
+  
+  va_start( args, format );
+  vsprintf( console_strbuf, format, args );
+  _consolePrintOnce(console_strbuf);
+  va_end(args);
+}
+
+void _consolePrintOnceEnd()
+{
+	if(consolePrintOnceEnd_callback){consolePrintOnceEnd_callback();}
+	for(col=0;col<CONSOLE_WIDTH;)_consolePrintChar(' ');
+	col=0;
+}
+
+void _consolePrintProgress(const char* s, u32 v1, u32 v2)
+{
+  if(consolePrintProgress_callback){consolePrintProgress_callback(s,v1,v2);return;}
+  _consolePrintf("%s %8d / %8d\r",s,v1,v2); //99MB is enough I think...
+}
+
+void _consoleStartProgress()
+{
+	if(consoleStartProgress_callback)consoleStartProgress_callback();
+}
+
+void _consoleEndProgress()
+{
+	if(consoleEndProgress_callback){consoleEndProgress_callback();}
+	for(col=0;col<CONSOLE_WIDTH;)_consolePrintChar(' ');
+	col=0;
 }
 
 void _consoleClear(void)
 {
+	if(consoleClear_callback){consoleClear_callback();return;}
 //	for(int i = 0; i < CONSOLE_HEIGHT * (CONSOLE_MAPWIDTH/2); i++) fontMap[i] = 0;
 	
 	{
@@ -212,11 +268,11 @@ void _consoleClear(void)
 	  while(DMA3_CR & DMA_BUSY);
 	}
 	
-	_consolePrintSet(0,0);
+	row=col=0; //_consolePrintSet(0,0);
 }
-
+/*
 void _consolePrintOne(char *str,u32 v)
 {
   _consolePrintf(str,v);
 }
-
+*/

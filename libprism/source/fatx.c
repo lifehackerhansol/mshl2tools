@@ -1,7 +1,5 @@
-#define MSHL2TOOLS_FATX
-
 /*
-	fatx.c - Very special libfat helper API
+	fatx.c - Very special FAT helper API
 	Make sure to use my modified libfat.
 	Calling getsfnlfn()/libprism_[f]utime() with unmodified libfat will cause unexpected result.
 	If you use other functions with unmodified libfat, it will mess something when used for folder.
@@ -12,6 +10,7 @@
 #include <fcntl.h> //O_
 #include <sys/iosupport.h> //for safer getting FILE_STRUCT
 __handle* __get_handle(int);
+//static u8 direntry[0x20];
 
 #define DIR_ENTRY_DATA_SIZE 0x20
 #define MAX_FILENAME_LENGTH 768
@@ -28,6 +27,11 @@ __handle* __get_handle(int);
 #define CLUSTER_FIRST	0x00000002
 #define CLUSTER_ERROR	0xFFFFFFFF
 
+///// start of actual code /////
+
+#if defined(LIBFAT) && defined(LIBELM)
+#error both LIBFAT and LIBELM are defined
+#elif defined(LIBFAT)
 // Directory entry offsets
 enum DIR_ENTRY_offset {
 	DIR_ENTRY_name = 0x00,
@@ -69,6 +73,10 @@ typedef struct {
 	u32 sectorsPerFat;
 	u32 lastCluster;
 	u32 firstFree;
+#ifdef USE_LIBFAT109
+	u32 numberFreeCluster;
+	u32 numberLastAllocCluster;
+#endif
 } FAT;
 
 typedef enum {FS_UNKNOWN, FS_FAT12, FS_FAT16, FS_FAT32} FS_TYPE;
@@ -90,6 +98,9 @@ typedef struct {
 	uint32_t              bytesPerSector;
 	uint32_t              sectorsPerCluster;
 	uint32_t              bytesPerCluster;
+#ifdef USE_LIBFAT109
+	uint32_t              fsInfoSector;
+#endif
 	FAT                   fat;
 	// Values that may change after construction
 	uint32_t              cwdCluster;			// Current working directory cluster
@@ -192,30 +203,37 @@ extern bool _FAT_directory_entryGetAlias (const u8* entryData, char* destName);
 extern PARTITION* _FAT_partition_getPartitionFromPath (const char* path);
 extern uint32_t _FAT_fat_nextCluster(PARTITION* partition, uint32_t cluster);
 
-u32 _FAT_fat_clusterToSector(PARTITION* partition, u32 cluster){
+static u32 _FAT_fat_clusterToSector(PARTITION* partition, u32 cluster){
 	return (cluster >= CLUSTER_FIRST) ? 
 		(cluster - CLUSTER_FIRST) * partition->sectorsPerCluster + partition->dataStart :
 		partition->rootDirStart;
 }
 
+void mbstoucs2(u16* dst, const char* src){_FAT_directory_mbstoucs2(dst,src,256);}
+void ucs2tombs(char* dst, const u16* src){_FAT_directory_ucs2tombs(dst,src,768);}
+u32  getPartitionHandle(){return (u32)_FAT_partition_getPartitionFromPath("fat:/");}
+u32  nextCluster(u32 handle, u32 cluster){return _FAT_fat_nextCluster((PARTITION*)handle,cluster);}
+
 u32 getFatDataPointer(){ //for getTrueSector
 	PARTITION *p=_FAT_partition_getPartitionFromPath("fat:/");
-	if(p->bytesPerSector!=512||p->sectorsPerCluster!=64){_consolePrintf("getFatDataPointer() will be useless if bytesPerSector!=512 || sectorsPerCluster!=64.\n");die();}
-	return p->dataStart-128;
+	if(p->bytesPerSector!=512||p->sectorsPerCluster!=64){_consolePrint("getFatDataPointer() will be useless if bytesPerSector!=512 || sectorsPerCluster!=64.\n");die();}
+	return p->dataStart-128; //back 2 clusters
 }
 
 void getsfnlfn(const char *path,char *sfn,u16 *lfn){ //path should be in UTF8
 	static char buf[256*3],ret[256*3];
-	int i,len;
+	int i=1,len;
 	FILE_STRUCT *fs;
 	int fd;
 
+	if(!path)return;
 	if(!sfn&&!lfn)return;
 	memset(&buf,0,256*3);
 	memset( sfn,0,256);
 	memset(&ret,0,256*3);
+	//if(!memcmp(path,"/./",3))path+=2;
 	len=strlen(path);
-	for(i=1;i<=len;i++){
+	for(;i<=len;i++){
 		if(path[i]=='/'||i==len){
 			//memset(&fs,0,sizeof(FILE_STRUCT));
 			strncpy(buf,path,i);
@@ -226,11 +244,12 @@ void getsfnlfn(const char *path,char *sfn,u16 *lfn){ //path should be in UTF8
 			fs=(FILE_STRUCT*)__get_handle(fd)->fileStruct;
 			//_consolePrintf("***%s\n",fs->dirEntry.filename);
 			if(lfn){
-				bool NTF_lowfn=false,NTF_lowext=false;
-				char *x;
+				//bool NTF_lowfn=false,NTF_lowext=false;
+				//char *x;
 				strcat(ret,"/");
-				strcpy(x=ret+strlen(ret),fs->dirEntry.filename);
-
+				strcat(ret+strlen(ret),fs->dirEntry.filename);
+#if 0
+		///// Now my modified libfat returns LFN also for 8.3 files in fs->dirEntry.filename
 		//must consider LFN (from MoonShell2.00beta5 source)
 		if(fs->dirEntry.entryData[DIR_ENTRY_reserved]&BIT(3)) NTF_lowfn=true;
 		if(fs->dirEntry.entryData[DIR_ENTRY_reserved]&BIT(4)) NTF_lowext=true;
@@ -247,7 +266,7 @@ void getsfnlfn(const char *path,char *sfn,u16 *lfn){ //path should be in UTF8
 					if(fc==0) break;
 				}
 			}
-			if(posperiod==(u32)-1){ //with ext
+			if(posperiod==(u32)-1){ //without ext
 				u32 idx;
 				for(idx=0;idx<MAX_FILENAME_LENGTH;idx++){
 					char fc=x[idx];
@@ -277,6 +296,7 @@ void getsfnlfn(const char *path,char *sfn,u16 *lfn){ //path should be in UTF8
 				}
 			}
 		}
+#endif
 			}
 			if(sfn){
 				strcat(sfn,"/");
@@ -359,19 +379,19 @@ int writePartitionInfo(type_printf writer){
 	PARTITION *p=_FAT_partition_getPartitionFromPath("fat:/");
 	if(!p||!writer)return -1;
 	writer(
-		"filesysType:       %s\n"
-		"totalSize:         %dK\n"
-		"rootDirStart:      %u\n"
-		"rootDirCluster:    %u\n"
-		"numberOfSectors:   %u\n"
-		"dataStart:         %u\n"
-		"bytesPerSector:    %u\n"
-		"sectorsPerCluster: %u\n"
-		"bytesPerCluster:   %u\n"
-		"fat.fatStart:      %u\n"
-		"fat.sectorsPerFat: %u\n"
-		"fat.lastCluster:   %u\n"
-		"fat.firstFree:     %u\n",
+		"filesysType:        %s\n"
+		"totalSize:          %dK\n"
+		"rootDirStart:       %u\n"
+		"rootDirCluster:     %u\n"
+		"numberOfSectors:    %u\n"
+		"dataStart:          %u\n"
+		"bytesPerSector:     %u\n"
+		"sectorsPerCluster:  %u\n"
+		"bytesPerCluster:    %u\n"
+		"fat.fatStart:       %u\n"
+		"fat.sectorsPerFat:  %u\n"
+		"fat.lastCluster:    %u\n"
+		"fat.firstFree:      %u\n",
 		p->filesysType==FS_FAT12?"FAT12":p->filesysType==FS_FAT16?"FAT16":p->filesysType==FS_FAT32?"FAT32":"Unknown",
 		(u32)(p->totalSize>>10),
 		p->rootDirStart,
@@ -386,6 +406,16 @@ int writePartitionInfo(type_printf writer){
 		p->fat.lastCluster,
 		p->fat.firstFree
 	);
+#ifdef USE_LIBFAT109
+	writer(
+		"fsInfoSector:       %u\n"
+		"fat.numFreeCluster: %u\n"
+		"fat.numLastAlloc:   %u\n",
+		p->fsInfoSector,
+		p->fat.numberFreeCluster,
+		p->fat.numberLastAllocCluster
+	);
+#endif
 	return 0;
 }
 
@@ -416,28 +446,6 @@ int libprism_utime(const char *path, time_t actime, time_t modtime){
 	int ret=libprism_futime(fd,actime,modtime);
 	close(fd);
 	return ret;
-}
-
-int fgetAttributes(int fd){
-	if(fd<0){return -1;}
-	FILE_STRUCT *fs=(FILE_STRUCT*)__get_handle(fd)->fileStruct;
-	u8 ret=fs->dirEntry.entryData[DIR_ENTRY_attributes];
-	return ret;
-}
-
-int getAttributes(const char *path){
-	int fd=open(path,O_RDONLY);
-	if(fd<0)return -1;
-	int ret=fgetAttributes(fd);
-	close(fd);
-	return ret;
-}
-
-u8* getDirEntFromDirIter(DIR_ITER *dp){
-	if(!dp)return NULL;
-	DIR_STATE_STRUCT* state=(DIR_STATE_STRUCT*)dp->dirStruct;
-	if(!state->validEntry)return NULL;
-	return state->currentEntry.entryData;
 }
 
 int libprism_touch(const char *path){
@@ -481,3 +489,247 @@ u32 getSectors(){
 	if(!p)return 0;
 	return p->numberOfSectors;
 }
+
+bool disc_mount(){
+	return fatInitDefault();
+}
+
+void disc_unmount(){ //You must call this before softreset; otherwise fsinfo will got messed up.
+#ifdef _LIBNDS_MAJOR_
+	fatUnmount("fat:/");
+#else
+	fatUnmount(0);
+#endif
+	//make sure...
+	disc_shutdown();
+}
+
+#elif defined(LIBELM)
+u32 UTCToDosTime(const u32 timer){
+	struct tm *t=localtime(&timer);
+	return (u32)(
+		((t->tm_year-80)<<25) |
+		((t->tm_mon+1)<<21) |
+		(t->tm_mday<<16) |
+		(t->tm_hour<<11) |
+		(t->tm_min<<5) |
+		(t->tm_sec>>1)
+	);
+}
+
+u32 DosTimeToUTC(const u32 dostime){
+	struct tm t;
+	memset(&t,0xff,sizeof(t));
+	t.tm_year=(dostime>>25)+80;
+	t.tm_mon=((dostime>>21)&0x0f)-1;
+	t.tm_mday=(dostime>>16)&0x1f;
+	t.tm_hour=(dostime>>11)&0x1f;
+	t.tm_min=(dostime>>5)&0x3f;
+	t.tm_sec=(dostime&0x1f)<<1;
+	return mktime(&t);
+}
+
+void mbstoucs2(u16* dst, const char* src){u16 *p=_ELM_mbstoucs2(src,NULL);Unicode_Copy(dst,p);}
+void ucs2tombs(char* dst, const u16* src){_ELM_ucs2tombs(dst,src);}
+u32  getPartitionHandle(){return (u32)_ELM_getFATFS();}
+u32  nextCluster(u32 handle, u32 cluster){return get_fat((FATFS*)handle,cluster);}
+
+u32 getFatDataPointer(){ //for getTrueSector
+	FATFS *p=_ELM_getFATFS();
+	if(/*p->ssize!=512||*/p->csize!=64){_consolePrint("getFatDataPointer() will be useless if bytesPerSector!=512 || sectorsPerCluster!=64.\n");die();}
+	return p->database-128; //back 2 clusters
+}
+
+void getsfnlfn(const char *path,char *sfn,u16 *lfn){ //path should be in UTF8
+	static char buf[256*3],ret[256*3];
+	int i=1,len;
+	FILINFO fs;
+
+	if(!sfn&&!lfn)return;
+	memset(&buf,0,256*3);
+	memset( sfn,0,256);
+	memset(&ret,0,256*3);
+	//if(!memcmp(path,"/./",3))path+=2;
+	len=strlen(path);
+	for(;i<=len;i++){
+		if(path[i]=='/'||i==len){
+			memset(&fs,0,sizeof(FILINFO));
+			strncpy(buf,path,i);
+			//_consolePrintf("***%s\n",buf);
+			if(f_stat(_ELM_mbstoucs2(buf,NULL),&fs)){_consolePrintf("\nCannot open %s.\nAccept your fate.\n",buf);die();}
+			//_consolePrintf("***%s\n",fs.dirEntry.filename);
+			//if(lfn){
+				//bool NTF_lowfn=false,NTF_lowext=false;
+				//char *x;
+			//	strcat(ret,"/");
+			//	strcat(ret+strlen(ret),fs->dirEntry.filename);
+			//}
+			if(sfn){
+				int j=0,l;
+				strcat(sfn,"/");
+				for(l=strlen(sfn);fs.fname[j];j++)
+					sfn[l+j]=fs.fname[j];
+				sfn[l+j]=0;
+			}
+		}
+	}
+	if(lfn)mbstoucs2(lfn,path); //no ways to get LFN for 8.3 files? I just hope path is already LFN.
+}
+
+u64 fgetFATEntryAddress(int fd){
+	if(fd<0)return 0;
+	FIL *fil=(FIL*)__get_handle(fd)->fileStruct;
+	if(!fil)return 0;
+
+	return fil->dir_sect*512 + fil->dir_ptr - fil->fs->win;
+}
+
+u64 getFATEntryAddress(const char *path){
+	int fd=open(path,O_RDONLY);
+	if(fd<0)return -1;
+	u64 ret=fgetFATEntryAddress(fd);
+	close(fd);
+	return ret;
+}
+
+u32 fgetSector(int fd){
+	FATFS *p=_ELM_getFATFS();
+	if(!p)return 0;
+	struct stat st;
+	if(fstat(fd,&st))return 0;
+	return clust2sect(p,st.st_ino);
+}
+
+u32 getSector(const char *path){
+	FATFS *p=_ELM_getFATFS();
+	if(!p)return 0;
+	struct stat st;
+	if(stat(path,&st))return 0;
+	return clust2sect(p,st.st_ino);
+}
+
+int fgetFragments(int fd){
+	if(fd<0)return -1;
+	FIL *fil=(FIL*)__get_handle(fd)->fileStruct;
+	u32 ret=0;
+	u32 clust,tmp,i=1;//,size=((fil->fsize+0x7fff)&~0x7fff)>>15;
+	//dbg_printf("size: %d\n",size);
+#if 0
+	for(clust=fil->sclust;i<size;){
+		tmp=get_fat(fil->fs,clust);
+		if(tmp==-1)return -1;
+		if(clust+1!=tmp)ret++;
+		clust=tmp;
+		i++;
+	}
+#endif
+	for(clust=fil->sclust;;){
+		tmp=get_fat(fil->fs,clust);
+		if(tmp<2||tmp>=fil->fs->n_fatent)break;
+		if(clust+1!=tmp)ret++;
+		clust=tmp;
+		i++;
+	}
+	return ret;
+}
+
+int getFragments(const char *path){
+	struct stat st;
+	stat(path,&st);
+	if(st.st_spare1&ATTRIB_DIR)return 0;
+
+	int fd=open(path,O_RDONLY);
+	if(fd<0)return -1;
+	int ret=fgetFragments(fd);
+	close(fd);
+	return ret;
+}
+
+int writePartitionInfo(type_printf writer){
+	FATFS *p=_ELM_getFATFS();
+	if(!p||!writer)return -1;
+
+	u32 free_clusters=0;
+	f_getfree("\0",&free_clusters,&p);
+	writer(
+		"filesysType:        %s\n"
+		"totalSize:          %dK\n"
+		"rootDirStart:       %u\n"
+		"numberOfSectors:    %u\n"
+		"dataStart:          %u\n"
+		"bytesPerSector:     %u\n"
+		"sectorsPerCluster:  %u\n"
+		"bytesPerCluster:    %u\n"
+		"fsInfoSector:       %u\n"
+		"fat.fatStart:       %u\n"
+		"fat.sectorsPerFat:  %u\n"
+		"fat.lastCluster:    %u\n"
+		"fat.numFreeCluster: %u\n"
+		"fat.numLastAlloc:   %u\n",
+		p->fs_type==FS_FAT12?"FAT12":p->fs_type==FS_FAT16?"FAT16":p->fs_type==FS_FAT32?"FAT32":"Unknown",
+		((p->n_fatent-2)*p->csize)>>1,
+		p->dirbase,
+		(p->n_fatent-2)*p->csize,
+		p->database,
+		512,
+		p->csize,
+		p->csize*512,
+		p->fsi_sector,
+		p->fatbase,
+		p->fsize,
+		p->n_fatent,
+		free_clusters,//p->free_clust,
+		p->last_clust
+	);
+	return 0;
+}
+
+//not implemented in libelm edition
+//int libprism_futime(int fd, time_t actime, time_t modtime);
+
+int libprism_utime(const char *path, time_t actime, time_t modtime){
+	if(modtime==1)return 0;
+	if(modtime==0)return libprism_touch(path);
+	u32 dostime=UTCToDosTime(modtime);
+	FILINFO fi;
+	fi.fdate=dostime>>16;
+	fi.ftime=(u16)dostime;
+	return f_utime(_ELM_mbstoucs2(_ELM_realpath(path),NULL),&fi);
+}
+
+int libprism_touch(const char *path){
+	u32 dostime=UTCToDosTime(time(NULL));
+	FILINFO fi;
+	fi.fdate=dostime>>16;
+	fi.ftime=(u16)dostime;
+	return f_utime(_ELM_mbstoucs2(_ELM_realpath(path),NULL),&fi);
+}
+
+//not implemented in libelm edition
+//int libprism_fchattr(int fd, u8 attr);
+
+int libprism_chattr(const char *path, u8 attr){
+	int ret=f_chmod(_ELM_mbstoucs2(_ELM_realpath(path),NULL),attr,0x27); //mask all
+	return ret;
+}
+
+u32 getSectors(){
+	FATFS *p=_ELM_getFATFS();
+	if(!p)return 0;
+	return p->csize*(p->n_fatent-2);
+}
+
+bool disc_mount(){
+	return ELM_Mount();
+}
+
+void disc_unmount(){ //You must call this before softreset; otherwise fsinfo will got messed up.
+	ELM_Unmount();
+	//make sure...
+	disc_shutdown();
+}
+
+#else
+#error define one of LIBFAT / LIBELM
+#endif
+

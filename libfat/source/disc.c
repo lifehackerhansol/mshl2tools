@@ -87,10 +87,15 @@ const INTERFACE_ID _FAT_disc_interfaces[] = {
 #elif defined (NDS)
 #include <nds/arm9/dldi.h>
 
+static const DISC_INTERFACE* get_io_dsisd (void) {
+	return &__io_dsisd;
+}
+
 const INTERFACE_ID _FAT_disc_interfaces[] = {
 	{"fat", dldiGetInternal},
+	{"sd",  get_io_dsisd},
 	{NULL, NULL}
-};	
+};
 
 /* ====================== GBA ====================== */
 #elif defined (GBA)

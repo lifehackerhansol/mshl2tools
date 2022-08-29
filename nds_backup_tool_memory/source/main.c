@@ -2,7 +2,6 @@
 #include "libcarddump.h"
 const u16 bgcolor=RGB15(4,0,12);
 
-u8	key_tbl[0x1078];
 char	*data;
 
 typedef struct{
@@ -18,7 +17,7 @@ dumphandle dump;
 struct stat st;
 
 void dumpstart(){
-	_consolePrintf("Insert target DS card.\r");
+	_consolePrintOnce("Insert target DS card.");
 	for(swiWaitForVBlank();;swiWaitForVBlank()){
 		if(!(IPCZ->keysdown))continue;
 		if(IPCZ->keysdown&KEY_A)break;
@@ -26,7 +25,7 @@ void dumpstart(){
 	}
 	dump.romID = Card_Open(key_tbl);
 	while(dump.romID == 0xFFFFFFFF){
-		_consolePrintf("Cannot be recognized. Insert again.\r");
+		_consolePrintOnce("Cannot be recognized. Insert again.");
 		for(swiWaitForVBlank();;swiWaitForVBlank()){
 			if(!(IPCZ->keysdown))continue;
 			if(IPCZ->keysdown&KEY_A)break;
@@ -34,7 +33,7 @@ void dumpstart(){
 		}
 		dump.romID = Card_Retry();
 	}
-	_consolePrintf("                                        \r");
+	_consolePrintOnceEnd();
 	dump.writeoffset=dump.dumpoffset=0;
 	Card_Read(dump.dumpoffset, data);	// Read Header Area (0x0000-0x3FFF)
 	sprintf(dump.name,"/%c%c%c%c_",
@@ -55,20 +54,21 @@ void dumpstart(){
 	dump.dumpoffset=512;
 	u32 dumpto=min(dump.writeoffset+2*1024*1024,dump.size);
 	u32 dumpto_relative=dumpto-dump.writeoffset;
+	_consoleStartProgress();
 	for(;dump.dumpoffset<dumpto;){
 		if(!Card_Read(dump.dumpoffset, data+(dump.dumpoffset-dump.writeoffset))){
-			_consolePrintf("                                        \r");
-			_consolePrintf("Dump failed...\n");free(data);die();
+			_consoleEndProgress();
+			_consolePrint("Dump failed...\n");free(data);die();
 		}
 		dump.dumpoffset+=512;
-		_consolePrintf("Dumping %7d / %7d\r",dump.dumpoffset-dump.writeoffset,dumpto_relative);
+		_consolePrintProgress("Dumping",dump.dumpoffset-dump.writeoffset,dumpto_relative);
 	}
-	_consolePrintf("                                        \r");
+	_consoleEndProgress();
 	Card_Close();
 }
 
 void dumpnext(){
-	_consolePrintf("Insert target DS card.\r");
+	_consolePrintOnce("Insert target DS card.");
 	for(swiWaitForVBlank();;swiWaitForVBlank()){
 		if(!(IPCZ->keysdown))continue;
 		if(IPCZ->keysdown&KEY_A)break;
@@ -77,9 +77,9 @@ void dumpnext(){
 	u32 romID = Card_Open(key_tbl);
 	while(romID != dump.romID){
 		if(romID==0xFFFFFFFF){
-			_consolePrintf("Cannot be recognized. Insert again.\r");
+			_consolePrintOnce("Cannot be recognized. Insert again.");
 		}else{
-			_consolePrintf("Different card. Insert again.\r");
+			_consolePrintOnce("Different card. Insert again.");
 		}
 		for(swiWaitForVBlank();;swiWaitForVBlank()){
 			if(!(IPCZ->keysdown))continue;
@@ -88,25 +88,26 @@ void dumpnext(){
 		}
 		romID = Card_Retry();
 	}
-	_consolePrintf("                                        \r");
+	_consolePrintOnceEnd();
 	u32 dumpto=min(dump.writeoffset+2*1024*1024,dump.size);
 	u32 dumpto_relative=dumpto-dump.writeoffset;
+	_consoleStartProgress();
 	for(;dump.dumpoffset<dumpto;){
 		if(!Card_Read(dump.dumpoffset, data+(dump.dumpoffset-dump.writeoffset))){
-			_consolePrintf("                                        \r");
-			_consolePrintf("Dump failed...\n");free(data);die();
+			_consoleEndProgress();
+			_consolePrint("Dump failed...\n");free(data);die();
 		}
 		dump.dumpoffset+=512;
-		_consolePrintf("Dumping %7d / %7d\r",dump.dumpoffset-dump.writeoffset,dumpto_relative);
+		_consolePrintProgress("Dumping",dump.dumpoffset-dump.writeoffset,dumpto_relative);
 	}
-	_consolePrintf("                                        \r");
+	_consoleEndProgress();
 	Card_Close();
 }
 
 void writestart(){
 	FILE *f;
 	u32 ptr=0;
-	_consolePrintf("Insert storage flashcart.\r");
+	_consolePrintOnce("Insert storage flashcart.");
 	for(swiWaitForVBlank();;swiWaitForVBlank()){
 		if(!(IPCZ->keysdown))continue;
 		if(IPCZ->keysdown&KEY_A)break;
@@ -114,8 +115,8 @@ void writestart(){
 	}
 	u32 romID = Card_Open(key_tbl);
 	bool fatinited=false;
-	while(romID == 0xFFFFFFFF && !(fatinited=fatInitDefault())){
-		_consolePrintf("Cannot be recognized. Insert again.\r");
+	while(romID == 0xFFFFFFFF && !(fatinited=disc_mount())){
+		_consolePrintOnce("Cannot be recognized. Insert again.");
 		for(swiWaitForVBlank();;swiWaitForVBlank()){
 			if(!(IPCZ->keysdown))continue;
 			if(IPCZ->keysdown&KEY_A)break;
@@ -124,17 +125,17 @@ void writestart(){
 		romID = Card_Retry();
 	}
 	if(romID!=0xFFFFFFFF)Card_Close();
-	_consolePrintf("                                        \r");
-	_consolePrintf("Checking libfat (phase 2)... ");
-	if(!fatinited&&!fatInitDefault()){
-		_consolePrintf(
+	_consolePrintOnceEnd();
+	_consolePrint("Checking FAT (Phase 2)... ");
+	if(!fatinited&&!disc_mount()){
+		_consolePrint(
 			"failed.\n"
 			"Some flashcarts cannot initialize DLDI after ejected...\n"
 			"In short nds_backup_tool_memory doesn't work on this flashcart.\n"
 		);
 		free(data);die();
 	}
-	_consolePrintf("done.\n");
+	_consolePrint("done.\n");
 	if(!stat(dump.name,&st)){
 		if(st.st_mode&S_IFDIR){
 			_consolePrintf("%s is a directory...\n",dump.name);free(data);die();
@@ -147,26 +148,23 @@ void writestart(){
 		}
 	}
 	if(!(f=fopen(dump.name,"wb"))){_consolePrintf("cannot open %s...\n",dump.name);free(data);die();}
+	_consoleStartProgress();
 	for(;ptr<dump.dumpoffset-dump.writeoffset;){
 		u32 writebyte=min(dump.dumpoffset-dump.writeoffset-ptr,65536);
 		fwrite(data+ptr,1,writebyte,f);
 		ptr+=writebyte;
-		_consolePrintf("Writing %7d / %7d\r",ptr,dump.dumpoffset-dump.writeoffset);
+		_consolePrintProgress("Writing",ptr,dump.dumpoffset-dump.writeoffset);
 	}
-	_consolePrintf("                                        \r");
+	_consoleEndProgress();
 	dump.writeoffset=dump.dumpoffset;
 	fclose(f);
-#ifdef _LIBNDS_MAJOR_
-	fatUnmount("fat:/");
-#else
-	fatUnmount(0);
-#endif
+	disc_unmount();
 }
 
 void writenext(){
 	FILE *f;
 	u32 ptr=0;
-	_consolePrintf("Insert storage flashcart.\r");
+	_consolePrintOnce("Insert storage flashcart.");
 	for(swiWaitForVBlank();;swiWaitForVBlank()){
 		if(!(IPCZ->keysdown))continue;
 		if(IPCZ->keysdown&KEY_A)break;
@@ -174,8 +172,8 @@ void writenext(){
 	}
 	u32 romID = Card_Open(key_tbl);
 	bool fatinited=false;
-	while(romID == 0xFFFFFFFF && !(fatinited=fatInitDefault())){
-		_consolePrintf("Cannot be recognized. Insert again.\r");
+	while(romID == 0xFFFFFFFF && !(fatinited=disc_mount())){
+		_consolePrintOnce("Cannot be recognized. Insert again.");
 		for(swiWaitForVBlank();;swiWaitForVBlank()){
 			if(!(IPCZ->keysdown))continue;
 			if(IPCZ->keysdown&KEY_A)break;
@@ -184,10 +182,10 @@ void writenext(){
 		romID = Card_Retry();
 	}
 	if(romID!=0xFFFFFFFF)Card_Close();
-	_consolePrintf("                                        \r");
-	if(!fatinited&&!fatInitDefault()){
-		_consolePrintf(
-			"fatInitDefault failed.\n"
+	_consolePrintOnceEnd();
+	if(!fatinited&&!disc_mount()){
+		_consolePrint(
+			"disc_mount failed.\n"
 		);
 		free(data);die();
 	}
@@ -195,30 +193,26 @@ void writenext(){
 		_consolePrintf("cannot stat %s...\n",dump.name);free(data);die();
 	}
 	if(st.st_size!=dump.writeoffset){
-		_consolePrintf("written size wrong...\n");free(data);die();
+		_consolePrint("written size wrong...\n");free(data);die();
 	}
 	if(!(f=fopen(dump.name,"r+b"))){_consolePrintf("cannot open %s...\n",dump.name);free(data);die();}
 	fseek(f,st.st_size,SEEK_SET);
+	_consoleStartProgress();
 	for(;ptr<dump.dumpoffset-dump.writeoffset;){
 		u32 writebyte=min(dump.dumpoffset-dump.writeoffset-ptr,65536);
 		fwrite(data+ptr,1,writebyte,f);
 		ptr+=writebyte;
-		_consolePrintf("Writing %7d / %7d\r",ptr,dump.dumpoffset-dump.writeoffset);
+		_consolePrintProgress("Writing",ptr,dump.dumpoffset-dump.writeoffset);
 	}
-	_consolePrintf("                                        \r");
+	_consoleEndProgress();
 	dump.writeoffset=dump.dumpoffset;
 	fclose(f);
-#ifdef _LIBNDS_MAJOR_
-	fatUnmount("fat:/");
-#else
-	fatUnmount(0);
-#endif
+	disc_unmount();
 }
 
 void Main(){
 	u32 dumpcount=1,dumprequired=0;
 
-	IPCZ->cmd=0;
 	_consolePrintf(
 		"nds_backup_tool_memory\n"
 		"*** very easy libcarddump frontend ***\n"
@@ -226,7 +220,9 @@ void Main(){
 		"%s\n%s\n\n",
 		ROMDATE,ROMENV
 	);
-	_consolePrintf("While swaping DS card, press A to proceed, press B to shutdown.\n\n");
+	if(IPCZ->NDSType>=NDSi){_consolePrint("DSi/3DS don't allow swapping DS card.\n");die();}
+
+	_consolePrint("While swaping DS card, press A to proceed, press B to shutdown.\n\n");
 
 	{
 		unsigned char dldiid[5];
@@ -237,35 +233,27 @@ void Main(){
 		_consolePrintf("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
 	}
 
-	_consolePrintf("Allocating internal buffer... ");
+	_consolePrint("Allocating internal buffer... ");
 	data=(char*)malloc(2*1024*1024); //2MB
-	if(!data){_consolePrintf("failed.\n");die();}
-	_consolePrintf("done.\n");
+	if(!data){_consolePrint("failed.\n");die();}
+	_consolePrint("done.\n");
 
-	_consolePrintf("Checking libfat (phase 1)... ");
+	_consolePrint("Checking FAT (Phase 1)... ");
 
-	if(!fatInitDefault()){_consolePrintf("failed.\n");free(data);die();}
-	_consolePrintf("done.\n");
-#ifdef _LIBNDS_MAJOR_
-	fatUnmount("fat:/");
-#else
-	fatUnmount(0);
-#endif
-
-	IPCZ->arm7bios_addr=key_tbl;
-	IPCZ->arm7bios_bufsize=0x1078;
-	IPCZ->cmd=GetARM7Bios;
-	while(IPCZ->cmd)swiWaitForVBlank();
+	if(!disc_mount()){_consolePrint("failed.\n");free(data);die();}
+	_consolePrint("done.\n");
+	disc_unmount();
 
 	dumpstart();
 	writestart();
 	dumprequired=(dump.size+2*1024*1024-1)/(2*1024*1024);
 	for(;dumpcount<dumprequired;dumpcount++){
-		_consolePrintf2("Swaps remained: %d   \r",dumprequired-dumpcount);
+		_consolePrintfOnce2("Swaps remained: %d   ",dumprequired-dumpcount);
 		dumpnext();
 		writenext();
 	}
-	_consolePrintf2("Swaps remained: 0   \r");
-	_consolePrintf("Congraturations, dump completed!\n");
-	fatInitDefault();free(data);die();
+	//_consolePrint2("Swaps remained: 0   ");
+	_consolePrintOnceEnd2();
+	_consolePrint("Congraturations, dump completed!\n");
+	disc_mount();free(data);die();
 }

@@ -1,6 +1,16 @@
 #include "../../libprism/libprism.h"
 const u16 bgcolor=RGB15(4,0,12);
 
+char usrcheat[27];
+void patchusrcheat(u8* buf){
+	_consolePrint("Patching usrcheat path...\n");
+	char *arm9=(char*)buf+512;
+	u32 size=read32(buf+0x2c),i=0;
+	for(;i<size;i++)
+		if(!memcmp(arm9+i,"/__rpg/cheats/usrcheat.dat",26))
+			memcpy(arm9+i,usrcheat,26);
+}
+
 typedef struct{
 	u32 gamecode;
 	u32 crc32;
@@ -47,10 +57,9 @@ void Main(){
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"; //744 paddings
-	TExtLinkBody extlink;
+	//TExtLinkBody extlink;
 	FILE *f;
 
-	IPCZ->cmd=0;
 	_consolePrintf(
 		"r4loader extlink\n"
 		"reset_mse_06b_for_ak2 by Moonlight, Rudolph, kzat3\n"
@@ -68,41 +77,66 @@ void Main(){
 		_consolePrintf("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
 	}
 
-	//_consolePrintf("Waiting... ");
+	//_consolePrint("Waiting... ");
 	//sleep(1);
-	//_consolePrintf("Done.\n");
+	//_consolePrint("Done.\n");
 
-	_consolePrintf("initializing libfat... ");
-	if(!fatInitDefault()){_consolePrintf("failed.\n");die();}
-	_consolePrintf("done.\n");
+	_consolePrint("initializing FAT... ");
+	if(!disc_mount()){_consolePrint("failed.\n");die();}
+	_consolePrint("done.\n");
 
-	_consolePrintf("Opening extlink... ");
-	if(!(f=fopen("/MOONSHL2/EXTLINK.DAT","rb"))){_consolePrintf("Failed.\n");die();}
-	fread(&extlink,1,sizeof(TExtLinkBody),f);
-	fclose(f);
-	if(extlink.ID!=ExtLinkBody_ID){_consolePrintf("Incorrect ID.\n");die();}
-	_consolePrintf("Done.\n");
+	_consolePrint("Opening frontend... ");
+	char utf8[768];
+	if(!readFrontend(utf8)){_consolePrint("Failed.\n");die();}
+	_consolePrint("Done.\n");
 
 	//magic
-	_consolePrintf("Setting filename... ");
-	*(vu32*)0x023fd900=0x1c|(14<<8);
+	_consolePrint("Setting filename... ");
+	*(vu32*)0x023fd900=0x10|(14<<8);
 	strcpy((char*)0x023fda00,"fat0:");
-	_FAT_directory_ucs2tombs((char*)0x023fda05,extlink.DataFullPathFilenameUnicode,762);
+	strcpy((char*)0x023fda05,utf8);
 	strcpy((char*)0x023fdd00,"fat0:");
-	char utf8[768];
-	_FAT_directory_ucs2tombs(utf8,extlink.DataFullPathFilenameUnicode,768);
 	strcpy(utf8+strlen(utf8)-3,"sav");
 	if(!stat(utf8,NULL))strcpy((char*)0x023fdd05,utf8);
-	_consolePrintf("Done.\n");
+	_consolePrint("Done.\n");
 
-	_consolePrintf("Parsing /__rpg/cheats/usrcheat.dat... ");
+	_consolePrint("Setting reset/DMA state... ");
+	{//set reset/DMA
+		FILE *fsave=fopen((char*)0x023fdd05,"rb");
+		char buf[7];
+		if(!fsave){_consolePrint("Cannot open save.\n");die();}
+		fseek(fsave,filelength(fileno(fsave))-4,SEEK_SET);
+		fread(buf,1,8,fsave);
+		fclose(fsave);
+		libprism_touch((char*)0x023fdd05);
+		if(!memcmp(buf+4,"NMSY",4)&&(buf[2]&0xfc)==0x0c){
+			if(buf[2]&1)*(vu32*)0x023fd900|=8; //DMA
+			if(buf[2]&2)*(vu32*)0x023fd900|=4; //reset
+			goto set_reset_done;
+		}
+
+		//default, need to get from YSMenu.ini.
+		if(!strcpy_safe(usrcheat,findpath(6,(char*[]){"/YSMenu/","/_SYSTEM_/","/TTMenu/","/__ak2/","/__rpg/","/"},"YSMenu.ini")))goto set_reset_done; //disable.
+//set_reset_ini:
+		ini_gets("YSMenu","DEFAULT_RESET","false",buf,6,usrcheat);
+		if(!strcmp(buf,"true"))*(vu32*)0x023fd900|=4;
+		ini_gets("YSMenu","DEFAULT_DMA","true",buf,6,usrcheat);
+		if(!strcmp(buf,"true"))*(vu32*)0x023fd900|=8;
+	}
+
+set_reset_done:
+	_consolePrint("Looking for usrcheat.dat... ");
+	if(!strcpy_safe(usrcheat,findpath(4,(char*[]){"/YSMenu/","/_SYSTEM_/","/TTMenu/","/__rpg/"},"usrcheat.dat")))goto finalize;
+
+//parsecheat:
+	_consolePrint("Parsing usrcheat.dat... ");
 	{
 		u8 head[512];
-		if(!(f=fopen((char*)0x023fda05,"rb"))){_consolePrintf("Cannot open ROM.\n");die();}
+		if(!(f=fopen((char*)0x023fda05,"rb"))){_consolePrint("Cannot open ROM.\n");die();}
 		fread(head,1,512,f);
 		u32 gamecode=read32(head+12),CRC32=crc32(0xffffffff,head,512);
 		fclose(f);
-		if(f=fopen("/__rpg/cheats/usrcheat.dat","rb")){
+		if(f=fopen(usrcheat,"rb")){
 			fread(head,1,12,f);
 			if(!memcmp(head,"R4 CheatCode",12)){
 				u32 fsize=filelength(fileno(f));
@@ -115,12 +149,23 @@ void Main(){
 					if(gamecode==cur.gamecode&&CRC32==cur.crc32){
 						*(vu32*)0x023fd904=cur.offset;
 						*(vu32*)0x023fd908=(next.offset?next.offset:fsize)-cur.offset;
-						*(vu32*)0x023fd900|=2; //enable cheating.
-						_consolePrintf("Done.\n");
+						u8 *p=(u8*)malloc(*(vu32*)0x023fd908);
+						if(p){
+							fseek(f,*(vu32*)0x023fd904,SEEK_SET);
+							fread(p,1,*(vu32*)0x023fd908,f);
+							u32 count=*(u32*)( p+align4(strlen((char*)p)+1) );
+							if(count&0xf0000000){ //enable it
+								*(vu32*)0x023fd900|=2; //enable cheating.
+								ret_menu9_callback=patchusrcheat;
+							}
+							free(p);
+						}
+						//*(vu32*)0x023fd900|=2; //enable cheating.
+						_consolePrint("Done.\n");
 						break;
 					}
 					if(!next.offset){
-						_consolePrintf("Not found.\n");
+						_consolePrint("Not found.\n");
 						break;
 					}
 				}
@@ -129,6 +174,7 @@ void Main(){
 		}
 	}
 
+finalize:
 	ini_gets("WoodMod",(char*)dldiid,file,file,768,"/__rpg/woodload.ini");
 
 	_consolePrintf("Rebooting to %s...\n",file);

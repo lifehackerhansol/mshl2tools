@@ -20,9 +20,9 @@ INCLUDES	:=	build
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH	:=	-mthumb-interwork
+ARCH	:=	-mthumb -mthumb-interwork
 
-CFLAGS	:=	-g -Wall -O2\
+CFLAGS	:=	-Wall -O2\
 			-mcpu=arm7tdmi -mtune=arm7tdmi -fomit-frame-pointer\
 			-ffast-math \
 			$(ARCH)
@@ -78,8 +78,10 @@ export LD	:=	$(CC)
 #---------------------------------------------------------------------------------
 
 .PHONY: $(BUILD) clean
- 
+
 #---------------------------------------------------------------------------------
+#ARM9 code (must be arm, not thumb):
+#it seems that -march=armv5te -mtune=arm946e-s causes freeze. I don't know why.
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
 	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
@@ -102,8 +104,8 @@ $(LOADBIN)	:	$(ARM7ELF)
 	@echo built ... $(notdir $@)
 
 $(ARM7ELF)	:	$(OFILES)
-	@echo linking $(notdir $@)
-	@$(LD)  $(LDFLAGS) $(OFILES) $(LIBPATHS) $(LIBS) -o $@
+#	@echo linking $(notdir $@)
+#	@$(LD)  $(LDFLAGS) $(OFILES) $(LIBPATHS) $(LIBS) -o $@
  
 #---------------------------------------------------------------------------------------
 endif

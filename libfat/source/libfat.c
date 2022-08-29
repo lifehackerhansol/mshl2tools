@@ -127,7 +127,7 @@ void fatUnmount (const char* name) {
 		return;
 	}
 
-	// Perform a quick check to make sure we're dealing with a libfat controlled device
+	// Perform a quick check to make sure we're dealing with a FAT...ntrolled device
 	if (devops->open_r != dotab_fat.open_r) {
 		return;
 	}
@@ -155,6 +155,7 @@ bool fatInit (uint32_t cacheSize, bool setAsDefaultDevice) {
 			// The first device to successfully mount is set as the default
 			if (defaultDevice < 0) {
 				defaultDevice = i;
+				break; ///
 			}
 		}
 	}
@@ -234,7 +235,7 @@ void fatGetVolumeLabel (const char* name, char *label) {
 
 	_FAT_mem_free(buf);
 
-	// Perform a quick check to make sure we're dealing with a libfat controlled device
+	// Perform a quick check to make sure we're dealing with a FAT...ntrolled device
 	if (devops->open_r != dotab_fat.open_r) {
 		return;
 	}	

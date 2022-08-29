@@ -1,12 +1,17 @@
 #include <nds/card.h>
-#include <nds/registers_alt.h> //to maintain r23
 #include "libprism.h" // DLDIDATA
+
+#if !defined(_LIBNDS_MAJOR_)
+#define	REG_AUXSPICNT		CARD_CR1
+#define	REG_AUXSPICNTH	CARD_CR1H
+#define	REG_ROMCTRL		CARD_CR2
+#endif
 
 #if 0
 static void cardWriteCommand(){
 	//int index;
 
-	CARD_CR1H = CARD_CR1_ENABLE | CARD_CR1_IRQ;
+	REG_AUXSPICNTH = CARD_CR1_ENABLE | CARD_CR1_IRQ;
 
 	//for(index = 0; index < 8; index++){
 	//	CARD_COMMAND[7-index] = command[index];
@@ -14,43 +19,43 @@ static void cardWriteCommand(){
 }
 #endif
 
-#define cardWriteCommand() (CARD_CR1H = CARD_CR1_ENABLE | CARD_CR1_IRQ)
+#define cardWriteCommand() (REG_AUXSPICNTH = CARD_CR1_ENABLE | CARD_CR1_IRQ)
 
 static void cardWaitReady(u32 flags){
 	bool ready = false;
 	do{
 		cardWriteCommand();
-		CARD_CR2 = flags;
+		REG_ROMCTRL = flags;
 		do{
-			if(CARD_CR2 & CARD_DATA_READY)
+			if(REG_ROMCTRL & CARD_DATA_READY)
 				if(!CARD_DATA_RD)ready = true;
-		}while(CARD_CR2 & CARD_BUSY);
+		}while(REG_ROMCTRL & CARD_BUSY);
 	}while(!ready);
 }
 
 static void _cardPolledTransfer(u32 flags, u32 *destination, u32 length){
 	u32 data;
 	cardWriteCommand();
-	CARD_CR2 = flags;
+	REG_ROMCTRL = flags;
 	u32 *target = destination + length;
 	do{
 		// Read data if available
-		if(CARD_CR2 & CARD_DATA_READY){
+		if(REG_ROMCTRL & CARD_DATA_READY){
 			data=CARD_DATA_RD;
 			if(destination < target)
 				*destination++ = data;
 		}
-	}while(CARD_CR2 & CARD_BUSY);
+	}while(REG_ROMCTRL & CARD_BUSY);
 }
 
 static void bytecardPolledTransfer(u32 flags, u32 *destination, u32 length){
 	u32 data;
 	cardWriteCommand();
-	CARD_CR2 = flags;
+	REG_ROMCTRL = flags;
 	u32 *target = destination + length;
 	do{
 		// Read data if available
-		if(CARD_CR2 & CARD_DATA_READY){
+		if(REG_ROMCTRL & CARD_DATA_READY){
 			data=CARD_DATA_RD;
 			if(destination < target){
 				((u8*)destination)[0] = data & 0xff;
@@ -60,7 +65,7 @@ static void bytecardPolledTransfer(u32 flags, u32 *destination, u32 length){
 				destination++;
 			}
 		}
-	}while(CARD_CR2 & CARD_BUSY);
+	}while(REG_ROMCTRL & CARD_BUSY);
 }
 
 // B0
@@ -142,26 +147,26 @@ void R4_LogicCardWrite(u32 address, u32 *source, u32 length){
 	CARD_COMMAND[6] = 0;
 	CARD_COMMAND[7] = 0;
 	cardWriteCommand();
-	CARD_CR2 = 0xe1586000;
+	REG_ROMCTRL = 0xe1586000;
 	u32 *target = source + length;
 	if((u32)source & 0x03){
 		do{
-			if(CARD_CR2 & CARD_DATA_READY){
+			if(REG_ROMCTRL & CARD_DATA_READY){
 				if(source < target){
 					data = ((u8*)source)[0] | (((u8*)source)[1] << 8) | (((u8*)source)[2] << 16) | (((u8*)source)[3] << 24);
 					source++;
 				}
 				CARD_DATA_RD = data;
 			}
-		}while(CARD_CR2 & CARD_BUSY);
+		}while(REG_ROMCTRL & CARD_BUSY);
 	}else{
 		do{
-			if(CARD_CR2 & CARD_DATA_READY){
+			if(REG_ROMCTRL & CARD_DATA_READY){
 				if(source < target)
 					data = *source++;
 				CARD_DATA_RD = data;
 			}
-		}while(CARD_CR2 & CARD_BUSY);
+		}while(REG_ROMCTRL & CARD_BUSY);
 	}
 	CARD_COMMAND[0] = 0xbc;
 	cardWaitReady(0xa7586000);
@@ -199,6 +204,6 @@ void SCDS_SetSDHCModeForDSTT(){
 
 	CARD_COMMAND[0] = 0x70;
 	_cardPolledTransfer(0xa7180000, &ret, 1); //it seems DSTT always return true...
-	//*(u32*)0x023ffc24=ret?1:0; //hack done. //this is invalid because dstt_sdhc is preserved in ARM7.
-	IPCZ->cmd=ret?EnableDSTTSDHCFlag:DisableDSTTSDHCFlag;
+	*(u32*)0x02fffc24=ret?1:0; //hack done.
+	CallARM7(ret?EnableDSTTSDHCFlag:DisableDSTTSDHCFlag);
 }
