@@ -50,7 +50,7 @@ int dldi(byte *nds,const int ndslen
 	byte *pD=NULL;
 	int dldilen;
 	//const byte *DLDIDATA=io_dldi_data;
-	const byte *DLDIDATA=((u32*)(&_io_dldi))-24;
+	const byte *DLDIDATA=(byte*)( ((u32*)(&_io_dldi))-24 );
 #endif
 
 	byte *pA=NULL,id[5],space;

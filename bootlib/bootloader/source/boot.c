@@ -38,6 +38,7 @@ Helpful information:
 #include <nds/system.h>
 #include <nds/interrupts.h>
 #include <nds/timers.h>
+#include <nds/debug.h>
 
 #if 0
 #define ARM9
@@ -76,6 +77,34 @@ extern unsigned long wantToPatchDLDI;
 extern unsigned long argStart;
 extern unsigned long argSize;
 extern unsigned long dsiSD;
+
+///
+int dldi(byte *nds,const int ndslen
+#if !defined(ARM9) && !defined(ARM7)
+	,const byte *pD,const int dldilen
+#endif
+);
+
+//#define NOCASH_DEBUG
+#ifdef NOCASH_DEBUG
+#include <string.h>
+void nocashMessageSafe(const char *s){
+//#ifdef _LIBNDS_MINOR_
+	const int LENGTH=112;
+	int i=0,c;
+	for(;i+LENGTH<strlen(s);i+=LENGTH){
+		c=s[i+LENGTH];
+		((char*)s)[i+LENGTH]=0;
+		nocashMessage(s+i);
+		((char*)s)[i+LENGTH]=c;
+	}
+	nocashMessage(s+i);
+//#endif
+}
+#else
+#define nocashMessageSafe(s)
+#endif
+///
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Firmware stuff
@@ -258,7 +287,9 @@ static bool sdmmc_inserted(){
 }
 
 static bool sdmmc_startup(){
+	extern void sdmmc_controller_init();
 	sdmmc_controller_init();
+	extern int sdmmc_sdcard_init();
 	return sdmmc_sdcard_init() == 0;
 }
 
@@ -269,7 +300,7 @@ bool sdmmc_sd_readsectors(u32 sector_no, u32 numsectors, void *out);
 #define myPM_LED_BLINK (3<<4)
 
 #define DSI_SD
-void main(){
+int main(){
 	if(dsiSD){
 #ifdef DSI_SD
 		_io_dldi.fn_readSectors = sdmmc_sd_readsectors;
@@ -280,11 +311,13 @@ void main(){
 
 	u32 fileCluster = storedFileCluster;
 	// Init card
+	nocashMessageSafe("arm7 init\n");
 	if(!FAT_InitFiles(initDisc))
 	{
 		writePowerManagement(0, PM_SYSTEM_PWR);
 		//return -1;
 	}
+	nocashMessageSafe("arm7 clustercheck\n");
 	if ((fileCluster < CLUSTER_FIRST) || (fileCluster >= CLUSTER_EOF)) 	/* Invalid file cluster specified */
 	{
 		fileCluster = getBootFileCluster(bootName);
@@ -294,7 +327,7 @@ void main(){
 		writePowerManagement(0, PM_SYSTEM_PWR);
 		//return -1;
 	}
-	
+	nocashMessageSafe("arm9 copy\n");
 	// ARM9 clears its memory part 2
 	// copy ARM9 function to RAM, and make the ARM9 jump to it
 	copyLoop((void*)TEMP_MEM, (void*)resetMemory2_ARM9, resetMemory2_ARM9_size);
@@ -323,5 +356,7 @@ void main(){
 	// Pass command line arguments to loaded program
 	passArgs_ARM7();
 	startBinary_ARM7();
+
+	return 0;///
 }
 

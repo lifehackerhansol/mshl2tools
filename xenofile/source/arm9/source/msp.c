@@ -69,11 +69,11 @@ static inline const TPlugin_StdLib *Plugin_GetStdLib(){
     MemCopy32DMA3,MemSet16DMA3,MemSet32DMA3,
     MemSet8DMA3,MemCopy16DMA2,MemSet16DMA2,
     MemCopy32swi256bit,
-    malloc,free,
+    (typeof(sPlugin_StdLib.safemalloc))malloc,(typeof(sPlugin_StdLib.safefree))free,
     
     calloc,malloc,free,realloc,
     rand,
-    fread,fseek,ftell,
+    (typeof(sPlugin_StdLib.fread))fread,(typeof(sPlugin_StdLib.fseek))fseek,(typeof(sPlugin_StdLib.ftell))ftell,
     sprintf,snprintf,
     memchr,memcmp,memcpy,memmove,memset,
     abs,labs,llabs,fabs,fabsf,

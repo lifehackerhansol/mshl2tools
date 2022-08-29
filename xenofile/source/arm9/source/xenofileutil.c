@@ -144,6 +144,26 @@ bool runTextEdit(char *file){
 	return BootLibrary(loader);
 }
 
+bool runAssoc(char *file,char *ext){
+	//FILE *f;
+	//TExtLinkBody extlink;
+	char loader[768];
+	ini_gets(ext+1,"launcher","",loader,768,"/__rpg/associations.ini");
+	//char *name=loader+strlen(loader);
+
+	if(!*loader){_consolePrint("Cannot find assoc. Very weird.\n");return false;}
+	char *ploader=loader;
+	//if(loader[3]=='0')loader[3]='1';
+	if(loader[4]==':'){
+		loader[0]=0;
+		memcpy(loader+1,"fat",3);
+		ploader=loader+1;
+	}
+	strcat(ploader,"\n");
+	strcat(ploader,file);
+	return BootLibrary(makeargv(ploader));
+}
+
 bool runExtLink(char *file,char *ext){
 	//FILE *f;
 	//TExtLinkBody extlink;
@@ -185,15 +205,54 @@ int iterateExtLink(int start){
 			for(;*x!='.';x++);
 			*x=0;
 			if(strlen(fname)&&strcasecmp(fname,"nds")&&fname[0]!='_'){
+				int _i=0;for(;_i<start;_i++)if(!strncasecmp(ext[_i]+1,fname,x-fname))break;
+				if(_i<start)continue; //ext is duplicated.
 				if(start>=EXTMAX){_consolePrintf2("sorry but ext limit %d exceeded.\n",EXTMAX);die();}
 				strcpy(ext[start],".");
 				strncpy(ext[start]+1,fname,x-fname);
-				_consolePrintf("Regist EXT: %s\n",name);
+				*x='.';_consolePrintf("Regist EXT: %s\n",name);
 				start++;
 			}
 		}
 	}
 	mydirclose(dp);
+	return start;
+}
+
+int iterateAssoc(int start){
+	char loader[768];
+	char name[16];
+	int i=0;
+	//_consolePrintf("---section---\n");
+	for(;ini_getsection(i, name, 16, "/__rpg/associations.ini");i++){
+		//if(!strcasecmp(getextname(fname),".nds")){
+			//char* x=fname;
+			//for(;*x!='.';x++);
+			//*x=0;
+			//if(strlen(fname)&&strcasecmp(fname,"nds")&&fname[0]!='_'){
+				//_consolePrintf("---launcher---\n");
+				ini_gets(name,"launcher","",loader,768,"/__rpg/associations.ini");
+				if(!*loader)continue;
+				char *ploader=loader;
+				//if(loader[3]=='0')loader[3]='1';
+				if(loader[4]==':'){
+					loader[0]=0;
+					memcpy(loader+1,"fat",3);
+					ploader=loader+1;
+				}
+				//_consolePrintf("---%s---\n",ploader);
+				if(access(ploader,0))continue;
+
+				int _i=0;for(;_i<start;_i++)if(!strcasecmp(ext[_i]+1,name))break;
+				if(_i<start)continue; //ext is duplicated.
+				if(start>=EXTMAX){_consolePrintf2("sorry but ext limit %d exceeded.\n",EXTMAX);die();}
+				strcpy(ext[start],".");
+				strcpy(ext[start]+1,name);
+				_consolePrintf("Regist ASSOC: %s\n",ploader);
+				start++;
+			//}
+		//}
+	}
 	return start;
 }
 
@@ -222,6 +281,10 @@ int iterateMSP(int start){
 			for(;i<4;i++){
 				if(!PH.ext[i])break;
 				if(PH.ext[i]==0x00706d62)continue; //deny BMP
+
+				int _i=0;for(;_i<start;_i++)if(!strncmp(ext[_i]+1,(char*)&PH.ext[i],4))break;
+				if(_i<start)continue; //ext is duplicated.
+
 				if(reg_msp_count>=MSPMAX){_consolePrintf2("sorry but msp limit %d exceeded.\n",MSPMAX);die();}
 				if(start>=EXTMAX){_consolePrintf2("sorry but ext limit %d exceeded.\n",EXTMAX);die();}
 				strcpy(reg_msp[reg_msp_count],name);//getfilename(name));//fname);

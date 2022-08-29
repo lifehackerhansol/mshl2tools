@@ -245,7 +245,7 @@ static bool _ram_test(){
 		return false;
 	}
 
-	if(_lock==_ez_lock)_lock(); //make sure CloseNorWrite() if attempting EZ
+	if(_lock==_ez_lock)_lock(); //make sure CloseNorWrite() if attempting EZ3/4
 	return false;
 }
 
@@ -254,8 +254,9 @@ static void _ram_precalc_size(){
 		return;
 		
 	extmem = _unlock();
-	_size = 0;
 
+#if 0
+	_size = 0;
 	extmem[0] = 0x2468;
 	while(extmem[_size] == 0x2468)
 	{
@@ -263,6 +264,15 @@ static void _ram_precalc_size(){
 		_size += 512;
 		extmem[_size] = 0x2468;
 	}
+#endif
+
+	extmem[0]=1;
+	for(_size=512;;_size+=512){
+		extmem[_size]=(_size>>9)+1;
+		if(extmem[_size]!=(_size>>9)+1 || extmem[0]!=1)break; //overwriting extmem[0] means that you reached mirrored area.
+		extmem[_size]=0;
+	}
+	extmem[0]=0;
 	_size<<=1;
 
 	//if(_type!=RAW_RAM)_lock();
@@ -343,7 +353,7 @@ vu16* ram_init(){
 			_unlock = _ez4_unlock;
 			_lock   = _ez_lock;
 			_type   = EZ4_RAM;
-			
+
 			if(_ram_test())
 			{
 				break;
@@ -352,7 +362,7 @@ vu16* ram_init(){
 			_unlock = _ez3in1_unlock;
 			_lock   = _ez_lock;
 			_type   = EZ3in1_RAM;
-			
+
 			if(_ram_test())
 			{
 				break;
@@ -437,9 +447,9 @@ vu16* ram_init(){
 		}
 		break;
 	}
-	
+
 	_ram_precalc_size();
-	
+
 	return extmem; //from here it is safe to refer to extmem variable
 }
 
@@ -488,8 +498,10 @@ void extmem_Free(){
 	if(tBody.pSlot!=NULL){
 		safefree(tBody.pSlot);
 		tBody.pSlot=NULL;
-		tBody.SlotCount=0;
 	}
+	tBody.EndAdr=tBody.StartAdr+_size;
+	tBody.CurAdr=tBody.StartAdr;
+	tBody.SlotCount=0;
 }
 
 bool extmem_ExistMemory(){
