@@ -2,8 +2,8 @@
 const u16 bgcolor=RGB15(4,0,12);
 const int useARM7Bios=0;
 
-char dldiid[5];
-void patchys(u8* buf){
+static char dldiid[5];
+static void patchys(u8* buf){
 	_consolePrint("Patching YSMenu... ");
 	char *arm9=(char*)buf+512;
 	arm9[0x220e7]=0xea; //yspatch
@@ -19,8 +19,7 @@ void patchys(u8* buf){
 	strcpy(arm9+0x5a7e8,dldiid);
 }
 
-void Main(){
-	char file[256*3]="MoonShellExecute\0\0\0\0\0\0\0\0\0\0\0" //will be modified externally
+static char file[256*3]="MoonShellExecute\0\0\0\0\0\0\0\0\0\0\0" //will be modified externally
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
@@ -47,6 +46,7 @@ void Main(){
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"; //744 paddings
 
+void Main(){
 	ret_menu9_callback=patchys;
 	_consolePrintf(
 		"YSMenu for all flashcart\n"

@@ -33,7 +33,7 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 LIBS	:= ../../libprism/libprism.a -lnds9
 ARCH	:=	-mthumb -mthumb-interwork
-CFLAGS	:=	-Wall -O0 \
+CFLAGS	:=	-Wall -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
 			-ffast-math -fdata-sections \
 			$(ARCH) -DARM9

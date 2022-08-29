@@ -40,7 +40,7 @@ enum{ //to make sure these are integers.
 	fixBss			= 0x08,
 };
 
-extern const byte *dldimagic;
+//extern const byte *dldimagic;
 
 extern const byte *_io_dldi;
 extern const byte *io_dldi_data;

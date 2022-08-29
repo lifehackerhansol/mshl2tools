@@ -2,8 +2,8 @@
 const u16 bgcolor=RGB15(4,0,12);
 const int useARM7Bios=0;
 
-char usrcheat[27];
-void patchusrcheat(u8* buf){
+static char usrcheat[27];
+static void patchusrcheat(u8* buf){
 	_consolePrint("Patching usrcheat path...\n");
 	char *arm9=(char*)buf+512;
 	u32 size=read32(buf+0x2c),i=0;
@@ -29,10 +29,9 @@ u32 crc32(u32 crc, const u8 *p, u32 size){
 		}
 	}
 	return crc;
-} 
+}
 
-void Main(){
-	char file[256*3]="MoonShellExecute\0\0\0\0\0\0\0\0\0\0\0" //will be modified externally
+static char file[256*3]="MoonShellExecute\0\0\0\0\0\0\0\0\0\0\0" //will be modified externally
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
@@ -58,7 +57,9 @@ void Main(){
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"; //744 paddings
-	//TExtLinkBody extlink;
+//static TExtLinkBody extlink;
+
+void Main(){
 	FILE *f;
 
 	_consolePrintf(

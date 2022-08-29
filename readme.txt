@@ -925,3 +925,12 @@ Added unbrickgwinstaller.
 
 0.91d1.140204 Phase:Neige
 Fixed minor stuff.
+
+0.91e.140514 Phase:Neige
+Rebuilt using devkitARMr42 and libnds 1.5.8.
+Updated libfat.
+
+0.91f.150301 Phase:neige
+Rebuilt using devkitARMr44 and libnds 1.5.10.
+Updated libfat.
+

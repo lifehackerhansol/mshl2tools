@@ -45,9 +45,6 @@
 #define DIR_ENTRY_LAST 0x00
 #define DIR_ENTRY_FREE 0xE5
 
-#define LAST_LFN_POS (19*13)
-#define LAST_LFN_POS_CORRECTION (MAX_LFN_LENGTH-15)
-
 typedef unsigned short ucs2_t;
 
 // Long file name directory entry
@@ -126,7 +123,7 @@ size_t _FAT_directory_mbstoucs2 (ucs2_t* dst, const char* src, size_t len) {
 	int bytes;
 	size_t count = 0;
 
-	while (count < len-1 && src != '\0') {
+	while (count < len-1 && *src != '\0') {
 		bytes = mbrtowc (&tempChar, src, MB_CUR_MAX, &ps);
 		if (bytes > 0) {
 			*dst = (ucs2_t)tempChar;
@@ -311,6 +308,7 @@ bool _FAT_directory_getNextEntry (PARTITION* partition, DIR_ENTRY* entry) {
 	while (!found && !notFound) {
 		if (_FAT_directory_incrementDirEntryPosition (partition, &entryEnd, false) == false) {
 			notFound = true;
+			break;
 		}
 
 		_FAT_cache_readPartialSector (partition->cache, entryData,
@@ -337,12 +335,10 @@ bool _FAT_directory_getNextEntry (PARTITION* partition, DIR_ENTRY* entry) {
 			}
 			if (lfnExists) {
 				lfnPos = ((entryData[LFN_offset_ordinal] & ~LFN_END) - 1) * 13;
-				if (lfnPos > LAST_LFN_POS) {
-					// Force it within the buffer. Will corrupt the filename but prevent buffer overflows
-					lfnPos = LAST_LFN_POS;
-				}
 				for (i = 0; i < 13; i++) {
-					lfn[lfnPos + i] = entryData[LFN_offset_table[i]] | (entryData[LFN_offset_table[i]+1] << 8);
+					if (lfnPos + i < MAX_LFN_LENGTH - 1) {
+						lfn[lfnPos + i] = entryData[LFN_offset_table[i]] | (entryData[LFN_offset_table[i]+1] << 8);
+					}
 				}
 			}
 		} else if (entryData[DIR_ENTRY_attributes] & ATTRIB_VOL) {
@@ -544,11 +540,10 @@ bool _FAT_directory_entryFromPosition (PARTITION* partition, DIR_ENTRY* entry) {
 		} else {
 			// Copy the long file name data
 			lfnPos = ((entryData[LFN_offset_ordinal] & ~LFN_END) - 1) * 13;
-			if (lfnPos > LAST_LFN_POS) {
-				lfnPos = LAST_LFN_POS_CORRECTION;
-			}
 			for (i = 0; i < 13; i++) {
-				lfn[lfnPos + i] = entryData[LFN_offset_table[i]] | (entryData[LFN_offset_table[i]+1] << 8);
+				if (lfnPos + i < MAX_LFN_LENGTH - 1) {
+					lfn[lfnPos + i] = entryData[LFN_offset_table[i]] | (entryData[LFN_offset_table[i]+1] << 8);
+				}
 			}
 		}
 	}
@@ -556,7 +551,8 @@ bool _FAT_directory_entryFromPosition (PARTITION* partition, DIR_ENTRY* entry) {
 	if (!entryStillValid) {
 		return false;
 	}
-	
+
+	entryStart = entry->dataStart;
 	if ((entryStart.cluster == entryEnd.cluster)
 		&& (entryStart.sector == entryEnd.sector)
 		&& (entryStart.offset == entryEnd.offset)) {
@@ -611,13 +607,6 @@ bool _FAT_directory_entryFromPath (PARTITION* partition, DIR_ENTRY* entry, const
 		// Start in current working directory
 		dirCluster = partition->cwdCluster;
 	}
-
-	// If the path is only specifying a directory in the form "." 
-	// and this is the root directory, return it
-	if ((dirCluster == partition->rootDirCluster) && (strcmp(".", pathPosition) == 0)) {
-		_FAT_directory_getRootEntry (partition, entry);
-		found = true;
-	}
 		
 	while (!found && !notFound) {
 		// Get the name of the next required subdirectory within the path
@@ -633,30 +622,39 @@ bool _FAT_directory_entryFromPath (PARTITION* partition, DIR_ENTRY* entry, const
 			return false;
 		}
 
-		// Look for the directory within the path
-		foundFile = _FAT_directory_getFirstEntry (partition, entry, dirCluster);
+		// Check for "." or ".." when the dirCluster is root cluster
+		// These entries do not exist, so we must fake it
+		if ((dirCluster == partition->rootDirCluster)
+		&&  ((strncmp(".", pathPosition, dirnameLength) == 0)
+		  || (strncmp("..", pathPosition, dirnameLength) == 0))) {
+			foundFile = true;
+			_FAT_directory_getRootEntry(partition, entry);
+		} else {
+			// Look for the directory within the path
+			foundFile = _FAT_directory_getFirstEntry (partition, entry, dirCluster);
 
-		while (foundFile && !found && !notFound) {			// It hasn't already found the file
-			// Check if the filename matches
-			if ((dirnameLength == strnlen(entry->filename, MAX_FILENAME_LENGTH))
-				&& (_FAT_directory_mbsncasecmp(pathPosition, entry->filename, dirnameLength) == 0)) {
-					found = true;
-			}
+			while (foundFile && !found && !notFound) {			// It hasn't already found the file
+				// Check if the filename matches
+				if ((dirnameLength == strnlen(entry->filename, MAX_FILENAME_LENGTH))
+					&& (_FAT_directory_mbsncasecmp(pathPosition, entry->filename, dirnameLength) == 0)) {
+						found = true;
+				}
 
-			// Check if the alias matches
-			_FAT_directory_entryGetAlias (entry->entryData, alias);
-			if ((dirnameLength == strnlen(alias, MAX_ALIAS_LENGTH))
-				&& (strncasecmp(pathPosition, alias, dirnameLength) == 0)) {
-					found = true;
-			}
+				// Check if the alias matches
+				_FAT_directory_entryGetAlias (entry->entryData, alias);
+				if ((dirnameLength == strnlen(alias, MAX_ALIAS_LENGTH))
+					&& (strncasecmp(pathPosition, alias, dirnameLength) == 0)) {
+						found = true;
+				}
 
-			if (found && !(entry->entryData[DIR_ENTRY_attributes] & ATTRIB_DIR) && (nextPathPosition != NULL)) {
-				// Make sure that we aren't trying to follow a file instead of a directory in the path
-				found = false;
-			}
+				if (found && !(entry->entryData[DIR_ENTRY_attributes] & ATTRIB_DIR) && (nextPathPosition != NULL)) {
+					// Make sure that we aren't trying to follow a file instead of a directory in the path
+					found = false;
+				}
 
-			if (!found) {
-				foundFile = _FAT_directory_getNextEntry (partition, entry);
+				if (!found) {
+					foundFile = _FAT_directory_getNextEntry (partition, entry);
+				}
 			}
 		}
 
@@ -669,6 +667,8 @@ bool _FAT_directory_entryFromPath (PARTITION* partition, DIR_ENTRY* entry, const
 			found = true;
 		} else if (entry->entryData[DIR_ENTRY_attributes] & ATTRIB_DIR) {
 			dirCluster = _FAT_directory_entryGetCluster (partition, entry->entryData);
+			if (dirCluster == CLUSTER_ROOT)
+				dirCluster = partition->rootDirCluster;
 			pathPosition = nextPathPosition;
 			// Consume separator(s)
 			while (pathPosition[0] == DIR_SEPARATOR) {
@@ -959,20 +959,22 @@ bool _FAT_directory_addEntry (PARTITION* partition, DIR_ENTRY* entry, uint32_t d
 		return false;
 	}
 
-	// Make sure the filename is at least a valid LFN
-	lfnLen = _FAT_directory_lfnLength (entry->filename);
-	if (lfnLen < 0) {
-		return false;
-	}
-
 	// Remove trailing spaces
 	for (i = strlen (entry->filename) - 1; (i > 0) && (entry->filename[i] == ' '); --i) {
 		entry->filename[i] = '\0';
 	}
+#if 0
 	// Remove leading spaces
 	for (i = 0; (i < (int)strlen (entry->filename)) && (entry->filename[i] == ' '); ++i) ;
 	if (i > 0) {
 		memmove (entry->filename, entry->filename + i, strlen (entry->filename + i));
+	}
+#endif
+
+	// Make sure the filename is at least a valid LFN
+	lfnLen = _FAT_directory_lfnLength (entry->filename);
+	if (lfnLen < 0) {
+		return false;
 	}
 
 	// Remove junk in filename
@@ -1014,15 +1016,14 @@ bool _FAT_directory_addEntry (PARTITION* partition, DIR_ENTRY* entry, uint32_t d
 				_FAT_directory_entryExists (partition, alias, dirCluster)) 
 			{
 				// expand primary part to 8 characters long by padding the end with underscores
-				i = MAX_ALIAS_PRI_LENGTH - 1; 
+				i = 0;
+				j = MAX_ALIAS_PRI_LENGTH - 1; 
 				// Move extension to last 3 characters
-				while (alias[i] != '.' && i > 0) i--;
-				if (i > 0) {
-					j = MAX_ALIAS_LENGTH - MAX_ALIAS_EXT_LENGTH - 2; // 1 char for '.', one for NUL, 3 for extension
-					memmove (alias + j, alias + i, strlen(alias) - i);
+				while (alias[i] != '.' && alias[i] != '\0') i++;
+				if (i < j) {
+					memmove (alias + j, alias + i, aliasLen - i + 1);
 					// Pad primary component
 					memset (alias + i, '_', j - i);
-					alias[MAX_ALIAS_LENGTH-1]=0;
 				}
 				
 				// Generate numeric tail
