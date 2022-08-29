@@ -45,7 +45,7 @@
 	Algorithm isn't copyrighted, so please refer to mshl2tools code, not copy it.
 
 	Moonlight has permitted to use his code freely,
-	in http://home.att.ne.jp/blue/moonlight/bbslog/log_post502.htm#post582
+	in http://mdxonline.dyndns.org/index_html/bbslog/log_post502.htm#post582
 */
 
 #include <nds.h>
@@ -64,7 +64,7 @@
 ///// Config end /////
 
 ///// include and version info /////
-#define ROMVERSION "0.88d.111211 Phase:Rebirth"
+#define ROMVERSION "0.90.120308 Phase:Rebirth"
 #define ROMDATE ""__DATE__" "__TIME__" GMT+09:00"
 
 #if defined(LIBFAT) && defined(LIBELM)
@@ -72,16 +72,16 @@
 #elif defined(LIBFAT)
 #include <fat.h>
 #ifdef _LIBNDS_MAJOR_
-#define ROMENV "DevKitARMr34 + libnds 1.5.4 +\nlibfat r4737(modified)"
+#define ROMENV "DevKitARMr37 + libnds r4875 +\nlibfat r4892(modified)"
 #else
 #define ROMENV "DevKitARMr23b + libnds-20071023/i +\nlibfat-20080530less(modified) [legacy]"
 #endif
 #elif defined(LIBELM)
 #include "../libelm/include/elm.h"
 #ifdef _LIBNDS_MAJOR_
-#define ROMENV "DevKitARMr34 + libnds 1.5.4 +\nlibelm R0.08b(modified)"
+#define ROMENV "DevKitARMr37 + libnds r4875 +\nlibelm R0.09(modified)"
 #else
-#define ROMENV "DevKitARMr23b + libnds-20071023/i +\nlibelm R0.08b(modified) [legacy]"
+#define ROMENV "DevKitARMr23b + libnds-20071023/i +\nlibelm R0.09(modified) [legacy]"
 #endif
 #else
 #error define one of LIBFAT / LIBELM
@@ -427,6 +427,7 @@ void SplitItemFromFullPathUnicode(const UnicodeChar *pFullPathUnicode,UnicodeCha
 int filelength(int fd);
 int copy(const char *old, const char *_new);
 char *findpath(int argc, char **argv, const char *name);
+char *parseargv(const char *str);
 char *makeargv(const char *str);
 void installargv(u8 *top, void *store); //use top=0x02fffe00 for normal purpose
 char *processlinker(const char *name);

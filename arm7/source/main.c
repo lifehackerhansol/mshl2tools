@@ -229,6 +229,7 @@ int main(){ //int argc, char **argv){
 		TIMER_CR(i) = 0;
 		TIMER_DATA(i) = 0;
 	}}
+	//nocashMessageSafe("[ARM7] Started.\n");
 
 	rtcReset();
 	irqInit();
@@ -236,13 +237,16 @@ int main(){ //int argc, char **argv){
 
 	SetYtrigger(80);
 #ifdef _LIBNDS_MAJOR_
+	//nocashMessageSafe("[ARM7] Initialize FIFO.\n");
 	fifoInit();
+	//nocashMessageSafe("[ARM7] Install System FIFO.\n");
 	installSystemFIFO();
 #endif
-
+	//nocashMessageSafe("[ARM7] Clear IPCZ.\n");
 	memset(((char*)IPCZ)+4,0,sizeof(TransferRegionZ)-4);
 	//(*(u32*)0x06000000)=0;
 
+	//nocashMessageSafe("[ARM7] Read Flash.\n");
 	Read_Flash(0x20, &fwsize, 2);
 	fwsize <<=3; //*= 8;
 	fwsize += 512;
@@ -299,6 +303,7 @@ int main(){ //int argc, char **argv){
 	bootstub=(u8*)0x02ff4000;
 	bootstub_arm7=(*(u64*)bootstub==0x62757473746F6F62ULL)?(*(type_void*)(bootstub+0x0c)):NULL;
 	IPCZ->cmd=0;
+	nocashMessageSafe("[ARM7] Entered mainloop.\n");
 	while(1){
 		swiWaitForVBlank();
 #ifdef _LIBNDS_MAJOR_

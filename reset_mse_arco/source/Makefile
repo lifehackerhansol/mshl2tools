@@ -19,7 +19,7 @@ clean:
 	ndstool	-c $(TARGET).mse -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -e9 0x02000450 -b $(TARGET).bmp "reset_mse_arco"
 	linkmaker	$(TARGET).mse
 	mselink	$(TARGET).mse /akmenu4.nds RPGS.nds
-	dldipatch	/opt/mshl2tools/r32/xenofile/source/dldi/rpgs.dldi RPGS.nds
+	dldipatch	../../xenofile/source/dldi/rpgs.dldi RPGS.nds
 	mv -f		$(TARGET).mse RPGS.nds ../
 
 linkmaker:	linkmaker.c
