@@ -154,7 +154,10 @@ void runNds(const char* filename, u32 cluster/*, bool initDisc, bool dldiPatchNd
 	VRAM_C_CR = VRAM_ENABLE | VRAM_C_LCD;
 	// Clear VRAM
 	vramset(VRAM_C, 0, 64*1024);
-	fread(VRAM_C,2,align2(st.st_size)/2,f);
+	//0.89c: modified read method
+	//fread(VRAM_C, 2, align2(st.st_size)/2, f);
+	fread(libprism_buf,1,st.st_size,f);
+	vramcpy(VRAM_C, libprism_buf, align2(st.st_size)/2);
 	fclose(f);
 	dldiloader((data_t*)VRAM_C, st.st_size); //loaderSize);
 
@@ -222,11 +225,11 @@ if(*(vu16*)VRAM_C>=6){ //bootlib v3 with DSi SD
 	NotifyARM7(ResetBootlib);
 #endif
 	irqDisable(IRQ_ALL);
-#ifndef _LIBNDS_MAJOR_
+//#ifndef _LIBNDS_MAJOR_
 	IC_InvalidateAll();
 	DC_FlushAll();
 	DC_InvalidateAll();
-#endif
+//#endif
 
 	// Give the VRAM to the ARM7
 	VRAM_C_CR = VRAM_ENABLE | VRAM_C_ARM7_0x06000000;

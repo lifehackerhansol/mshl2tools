@@ -36,7 +36,7 @@ u32 keys;
 	hold Down:   nesDS r87+ (0.56a1)
 	hold Left:   
 	hold Right:  
-	none:        nesDS r92 (1.0a)
+	none:        nesDS r98 (1.0)
 
 	nesDS EX series 0.22/0.30 aren't implemented. Use 0.31 (final version).
 	Please note that nesDS ORG/EX/0.44's arm7 are shared.
@@ -114,6 +114,13 @@ void loadNesDSLegacy(){
 }
 
 void Main(){
+	strcpy(libprism_cbuf,myname);
+	if(*argname){
+		strcat(libprism_cbuf,"\n");
+		strcat(libprism_cbuf,argname);
+	}
+	makeargv(libprism_cbuf);
+
 	keys=IPCZ->keysheld;
 	if(keys&(KEY_A|KEY_B|KEY_X|KEY_Y|KEY_L|KEY_START))loadNesDSLegacy();
 

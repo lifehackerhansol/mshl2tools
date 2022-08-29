@@ -31,7 +31,7 @@ void Main(){
 	fread(libprism_cbuf,1,filelength(fileno(f)),f);
 	fclose(f);
 	//makeargv(libprism_buf);
-	ret_menu9_Gen(makeargv(libprism_cbuf));
+	ret_menu9_Gen(parseargv(libprism_cbuf));
 
 	_consolePrint("Failed.\n");
 	die();

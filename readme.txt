@@ -860,3 +860,27 @@ Cleaned up ram.c.
 0.88d.111211 Phase:Rebirth
 Fixed XenoFile's CRC16 calculation. (Now it shows the same value as LHA)
 Fixed XenoFile's very rare case bug: if selected music file can't be opened, xenofile freezes.
+
+0.88e.111216 (Internal)
+Added gbadump.
+
+0.89.120113 Phase:Rebirth
+Hopefully XenoFile's warning are resolved using typeof casting (lol).
+Rebuilt with DevKitARMr37 + libnds r4875.
+Fixed mondayloader.
+Updated nesdswrap.
+
+0.89a.120122 Phase:Rebirth
+savbackup now uses r+b if target is already present.
+
+0.89b.120209 Phase:Rebirth
+Added Google TwoFactor Authenticator on NDS.
+
+0.89c.120228 Phase:Rebirth
+Fixed libelm's bootlib loader.
+Fixed libelm's obtaining SFN.
+
+0.90.120308 Phase:Rebirth
+nesdswrap hotfix.
+detects extmem size more precisely.
+XenoFile can now call /__rpg/associations.ini (libfat only).

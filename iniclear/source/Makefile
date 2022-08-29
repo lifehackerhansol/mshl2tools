@@ -49,7 +49,7 @@ r4isdhc:	r4isdhc.c
 	dldipatch	../../xenofile/source/dldi/demo.dldi r4.dat
 	ndstool	-c scfw.sc -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -e9 0x02000450 -b $(TARGET).bmp "iniclear launcher;R4TF/TTIO/SCDS/RPGS/M3DS" -g ENG0 00 MSFORSC
 	cp		scfw.sc dsgame.nds
-	cp		scfw.sc dsgame_ismart.nds
+	#cp		scfw.sc dsgame_ismart.nds
 	dldipatch	../../xenofile/source/dldi/dsi2.dldi dsgame.nds
 	dldipatch	../../xenofile/source/dldi/scds.dldi scfw.sc
 	mv -f	$(TARGET).nds ez5sys.bin ez5isys.bin ismat.dat ttmenu.dat akmenu4.nds akmenu4_akrpg.nds akmenu4_acek.nds r4.dat scfw.sc dsgame.nds ../

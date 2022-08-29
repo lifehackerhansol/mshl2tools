@@ -121,7 +121,7 @@ void Main(){
 	uint8_t sectorBuffer[512] = {0};
 
 	_consolePrintf(
-		"stripmbr obly for emulators\n"
+		"stripmbr only for emulators\n"
 		"%s\n%s\n\n",
 		ROMDATE,ROMENV
 	);
