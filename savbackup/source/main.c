@@ -1,5 +1,6 @@
 #include "../../libprism/libprism.h"
 const u16 bgcolor=RGB15(10,10,0);
+const int useARM7Bios=0;
 
 int BackupAsSav,BidirectionalCopy;
 

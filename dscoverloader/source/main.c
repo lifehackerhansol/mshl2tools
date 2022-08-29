@@ -1,11 +1,12 @@
 #include <sys/stat.h>
 #include "../../libprism/libprism.h"
 const u16 bgcolor=RGB15(6,10,0);
+const int useARM7Bios=0;
 
 void Main(){
 	FILE *f;
 	//TExtLinkBody extlink;
-	int size,hbmode=0;
+	int size;//,hbmode=0;
 	unsigned char head[0x200];
 	char dldiid[5];
 

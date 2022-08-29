@@ -51,6 +51,9 @@ int selectpref(char *title,int argc, char **argv);
 //savconv
 bool savConvert(char *file);
 
+//openpatch
+int openpatch_single(const char *arg);
+
 //keyboard
 extern const unsigned char keyboard_Hit[];
 extern const unsigned char keyboard_Hit_Shift[];

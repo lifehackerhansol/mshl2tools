@@ -12,16 +12,19 @@
 
 ret_menu9_GENs:
 	mov	r4, #0x4000000
-	str	r4, [r4, #+0x208]		@ *(04000208)=#0x4000000
+	str	r4, [r4, #+0x208]		@ *(04000208)=#0x4000000 REG_IME
 	mov	r7, #0xE000
-	str	r7, [r4, #+0x204]		@ *(04000204)=#0xE000
+	str	r7, [r4, #+0x204]		@ *(04000204)=#0xE000 REG_EXMEMCNT
 
 	mov	r4, #0x4000000
 	mov	r0, #0x0
 	mvn	r1, #0x0
-	str	r0, [r4, #+0x208]		@ *(04000208)=#0
-	str	r0, [r4, #+0x210]		@ *(04000210)=#0
-	str	r1, [r4, #+0x214]		@ *(04000214)=#0
+	str	r0, [r4, #+0x208]		@ *(04000208)=#0 REG_IME
+	str	r0, [r4, #+0x210]		@ *(04000210)=#0 REG_IE
+	@ldr r0, =0x8008
+	@ldr r7, =0x04000184
+	@strh r0, [r7]		@ *(04000184)=#0x8008 REG_IPC_FIFO_CR
+	str	r1, [r4, #+0x214]		@ *(04000214)=#0 REG_IF
 
 	mov	r1, #0x0
 mcr_lp0:
@@ -76,15 +79,15 @@ TimDMA_lp:
 	str	r0, [r4, #+0x0]			@ *(02fffe04)=#0
 	ldr	r3, =0x80808080
 	mov	r1, #0x4000000
-	str	r3, [r1, #+0x240]		@ *(04000240)=#0x80808080
+	str	r3, [r1, #+0x240]		@ *(04000240)=#0x80808080 VRAM_CR
 	mov	r3, #0x5000000
 	mvn	r2, #0x0
 	strh	r2, [r3, #+0x0]			@ *(05000000)=#0xFFFF
 	add	r3, r3, #0x2
-	str	r4, [r1, #+0xD4]		@ *(040000d4)=#0x02fffe04
+	str	r4, [r1, #+0xD4]		@ *(040000d4)=#0x02fffe04 DMA3_SRC
 	ldr	r2, =0x850001FF
-	str	r3, [r1, #+0xD8]		@ *(040000d8)=#0x5000002
-	str	r2, [r1, #+0xDC]		@ *(040000dc)=#0x850001ff
+	str	r3, [r1, #+0xD8]		@ *(040000d8)=#0x5000002 DMA3_DEST
+	str	r2, [r1, #+0xDC]		@ *(040000dc)=#0x850001ff DMA3_CR
 
 DMA_lp0:
 	ldr	r3, [r1, #+0xDC]		@ r3 = *(040000dc)
@@ -92,10 +95,10 @@ DMA_lp0:
 	blt	DMA_lp0
 
 	mov	r2, #0x7000000
-	str	r4, [r1, #+0xD4]		@ *(040000d4)=#0x02fffe04
+	str	r4, [r1, #+0xD4]		@ *(040000d4)=#0x02fffe04 DMA3_SRC
 	ldr	r3, =0x85000200
-	str	r2, [r1, #+0xD8]		@ *(040000d8)=#0x7000000
-	str	r3, [r1, #+0xDC]		@ *(040000dc)=#0x85000200
+	str	r2, [r1, #+0xD8]		@ *(040000d8)=#0x7000000 DMA3_DEST
+	str	r3, [r1, #+0xDC]		@ *(040000dc)=#0x85000200 DMA3_CR
 	add	r2, r2, #0xFD000000
 
 DMA_lp1:
@@ -139,30 +142,30 @@ DMA_lp4:
 	ldr	r1, =0x04000200
 	ldr	r2, =0x04001000
 	mov	r3, #0x0
-	strh	r3, [r12, #+0x4]	@ *(04000004)=#0
+	strh	r3, [r12, #+0x4]	@ *(04000004)=#0 REG_DISPSTAT
 	ldr	r0, =0xffff820f
-	str	r3, [r12, #+0x0]	@ *(04000000)=#0
-	str	r3, [r2, #+0x0]		@ *(04001000)=#0
-	strb	r3, [r1, #+0x40]	@ *(04000240)=#0
+	str	r3, [r12, #+0x0]	@ *(04000000)=#0 REG_DISPCNT
+	str	r3, [r2, #+0x0]		@ *(04001000)=#0 REG_DISPCNT_SUB
+	strb	r3, [r1, #+0x40]	@ *(04000240)=#0 VRAM_A_CR
 	mov	r2, #0x3000000
-	strb	r3, [r1, #+0x41]	@ *(04000241)=#0
-	strb	r3, [r1, #+0x42]	@ *(04000242)=#0
-	strb	r3, [r1, #+0x43]	@ *(04000243)=#0
-	strb	r3, [r1, #+0x44]	@ *(04000244)=#0
-	strb	r3, [r1, #+0x45]	@ *(04000245)=#0
-	strb	r3, [r1, #+0x46]	@ *(04000246)=#0
-	strb	r3, [r1, #+0x48]	@ *(04000248)=#0
-	strb	r3, [r1, #+0x49]	@ *(04000249)=#0
+	strb	r3, [r1, #+0x41]	@ *(04000241)=#0 VRAM_B_CR
+	strb	r3, [r1, #+0x42]	@ *(04000242)=#0 VRAM_C_CR
+	strb	r3, [r1, #+0x43]	@ *(04000243)=#0 VRAM_D_CR
+	strb	r3, [r1, #+0x44]	@ *(04000244)=#0 VRAM_E_CR
+	strb	r3, [r1, #+0x45]	@ *(04000245)=#0 VRAM_F_CR
+	strb	r3, [r1, #+0x46]	@ *(04000246)=#0 VRAM_G_CR
+	strb	r3, [r1, #+0x48]	@ *(04000248)=#0 VRAM_H_CR
+	strb	r3, [r1, #+0x49]	@ *(04000249)=#0 VRAM_I_CR
 	ldr	r3, =0x04000300
-	str	r2, [r12, #+0x240]	@ *(04000240)=#0x3000000
+	str	r2, [r12, #+0x240]	@ *(04000240)=#0x3000000 VRAM_CR
 	mov 	r2, #0x3
-	strh	r0, [r3, #+0x4]		@ *(04000304)=0xffff820f
-	strb	r2, [r1, #+0x47]	@ *(04000247)=#0x3
+	strh	r0, [r3, #+0x4]		@ *(04000304)=0xffff820f REG_POWERCNT
+	strb	r2, [r1, #+0x47]	@ *(04000247)=#0x3 WRAM_CR
 
 
 	mov	r3, #0x4000000
 	ldr	r5, =0x0000e880
-	str	r5, [r3, #+0x204]	@ *(04000204)=#0x0000e880
+	str	r5, [r3, #+0x204]	@ *(04000204)=#0x0000e880 REG_EXMEMCNT
 
 	ldr	r0,=0x4004008
 	ldr	r0,[r0]
@@ -185,4 +188,3 @@ dsi_mode:
 	bx	r0				@ JUMP 0cfFFDF8
 
  .END
-

@@ -24,6 +24,14 @@ u16 *b15ptrSub=(u16*)0x06208000;
 
 char __sig_mode[8]="\xFE""cMode\x01";
 
+char **argv;
+int argc;
+char *argvToInstall;
+int argvToInstallSize;
+char mydrive[12];
+int nocashMessageMain;
+int nocashMessageSub;
+
 const byte DLDINull[]={
 	0x00,0xA5,0x8D,0xBF,0x20,0x43,0x68,0x69,0x73,0x68,0x6D,0x00,0x01,0x0F,0x00,0x0F,
 	0x44,0x65,0x66,0x61,0x75,0x6C,0x74,0x20,0x28,0x4E,0x6F,0x20,0x69,0x6E,0x74,0x65,
@@ -136,7 +144,7 @@ void DisableB15Sub(){
 }
 
 TransferRegionZ volatile *IPCZ;
-int main(){
+int main(int __argc, char **__argv){
 	IPCZ=(*(vu32*)0x04004000)?IPCZ_DSiMode:IPCZ_DSMode;
 	//IPCZ=IPCZ_DSMode;
 
@@ -167,6 +175,12 @@ int main(){
 #endif
 	//REG_IME=0;
 
+	argv=__argv;
+	argc=__argc;
+	argvToInstall=NULL;
+	argvToInstallSize=0;
+	memset(mydrive,0,sizeof(mydrive));
+
 	DLDIToBoot=DLDIDATA;
 	*(byte*)DLDINull=0xed;
 	PrintfToDie=_consolePrintf;
@@ -191,6 +205,8 @@ int main(){
 	consoleEndProgress2_callback=NULL;
 
 	fpassarg=false;
+	nocashMessageMain=1;
+	nocashMessageSub=1;
 
 	//InitVRAM
 	//From 0.51m, you can use BG_BMP_RAM(2)/BG_BMP_RAM_SUB(2) (u16 [256*192]) to display image.
@@ -319,7 +335,32 @@ int main(){
 
 	_consolePrint2("Checking ARGV...\n");
 	if(*(vu32*)0x02fffe70==0x5f617267){
-		*(vu32*)0x02fffe70=0; //hide it from libfat
+		*(vu32*)0x02fffe70=0; //hide it from libfat to avoid "chdir to myself"
+		char *arg=argv[0];
+		while(*arg&&*arg!='/')arg++;
+		if(!*arg){
+			_consolePrint2("warn: no '/' in argv[0], mypath is discarded.\n"); //perhaps that's memory garbage. need to ignore.
+		}else{
+			strcpy(myname,arg);
+			strcpy(mypath,arg);
+			int i=strlen(mypath)+1;
+			for(;i>0;i--)if(mypath[i-1]=='/'){mypath[i]=0;break;}
+
+			if(argc>1){
+				char *arg=argv[1];
+				while(*arg&&*arg!='/')arg++;
+				if(!*arg){
+					_consolePrint2("warn: no '/' in argv[1], argpath is discarded.\n"); //perhaps that's memory garbage. need to ignore.
+				}else{
+					strcpy(argname,arg);
+					strcpy(argpath,arg);
+					int i=strlen(argpath)+1;
+					for(;i>0;i--)if(argpath[i-1]=='/'){argpath[i]=0;break;}
+				}
+			}
+		}
+
+/*
 		_consolePrintf2("argv: 0x%08x\n%s\n",*(vu32*)0x02fffe74,*(char**)0x02fffe74);
 		char *arg=*(char**)0x02fffe74;
 		while(*arg&&*arg!='/')arg++;
@@ -346,11 +387,14 @@ int main(){
 			}
 		}
 		_consolePrint2("\n");
+*/
 	}
-#ifndef _LIBNDS_MAJOR_
+#if 0 //unneeded with modified ds_arm9_crt0.s
+#ndef _LIBNDS_MAJOR_
 	if(!mypath[1]&&*(vu32*)0x027ffe70==0x5f617267){
 		_consolePrint2("Falling back to 0x027xxxxx...\n");
-		*(vu32*)0x027ffe70=0; //hide it from libfat
+		*(vu32*)0x027ffe70=0; //hide it from libfat to avoid "chdir to myself"
+/*
 		_consolePrintf2("argv: 0x%08x\n%s\n",*(vu32*)0x027ffe74,*(char**)0x027ffe74);
 		char *arg=*(char**)0x027ffe74;
 		while(*arg&&*arg!='/')arg++;
@@ -377,6 +421,7 @@ int main(){
 			}
 		}
 		_consolePrint2("\n");
+*/
 	}
 #endif
 
@@ -386,6 +431,7 @@ int main(){
 	_consolePrint2("Start.\n\n");
 	SCDS_SetSDHCModeForDSTT();
 	InitializeKeyTable();
+	//fifoSendValue32(FIFO_PM, PM_REQ_SLEEP_DISABLE);
 	Main();
 
 	_consolePrint("Program real Main() end. Finalization seems to have failed.\n");
@@ -644,7 +690,7 @@ int copy(const char *old, const char *new){
 	int size=filelength(fileno(in));
 	int read,cur=0;
 	_consoleStartProgress2();
-	while((read=fread(libprism_buf,1,65536,in))>0){
+	while((read=fread(libprism_buf,1,BUFLEN,in))>0){
 		cur+=read;
 		fwrite(libprism_buf,1,read,out);
 		_consolePrintProgress2("Copying",cur,size);
@@ -667,10 +713,13 @@ char *findpath(int argc, char **argv, const char *name){
 	return NULL;
 }
 
-void installargv(u8 *top, void *store, const char *nds){
-	*(vu32*)(top+0x70)=0x5f617267;
-	*(vu32*)(top+0x74)=(u32)store;
+void installargv(u8 *top, void *store){
+	if(top)*(vu32*)(top+0x70)=0x5f617267;
+	if(top)*(vu32*)(top+0x74)=(u32)store;
 	//vramcpy(store,nds,strlen(nds)+1);
+	vramcpy((u16*)store,argvToInstall,align2(argvToInstallSize)/2);
+	if(top)*(vu32*)(top+0x78)=argvToInstallSize;
+#if 0
 	strcpy((char*)store,"fat:");
 	strcpy((char*)store+4,nds);
 	*(vu32*)(top+0x78)=strlen(nds)+5;
@@ -680,6 +729,48 @@ void installargv(u8 *top, void *store, const char *nds){
 		strcpy(p+4,argname);
 		*(vu32*)(top+0x78)+=strlen(argname)+5;
 	}
+#endif
+}
+
+char *makeargv(const char *str){ //str is memory obtained by fread argv file.
+	if(argvToInstall)free(argvToInstall);
+	argvToInstallSize=0;
+	if(!str&&!*str)return NULL; //this will cause program to crash, be careful bah
+	int i,j;
+	char *seps="\n\r\t #";
+	//char c;
+	//1st: get size
+	for(i=0;i<strlen(str);i++){
+		if(strchr(seps,str[i])){
+			if(argvToInstallSize)argvToInstallSize++;
+			for(;i<strlen(str)&&strchr(seps,str[i]);i++)
+				if(str[i]=='#')
+					for(;i<strlen(str)&&str[i]=='\n';i++);
+		}
+		argvToInstallSize++;
+	}
+	if(!strchr(seps,str[strlen(str)-1]))argvToInstallSize++;
+
+	argvToInstall=(char*)malloc(argvToInstallSize+4); //4==strlen("fat:")
+	if(!argvToInstall){argvToInstallSize=0;return NULL;}
+	//2nd: make
+	for(i=j=0;i<strlen(str);i++){
+		if(strchr(seps,str[i])){
+			if(j)argvToInstall[j++]=0;
+			for(;i<strlen(str)&&strchr(seps,str[i]);i++)
+				if(str[i]=='#')
+					for(;i<strlen(str)&&str[i]=='\n';i++);
+		}
+		if(!j && str[i]=='/'){ //force to add fat: to argv[0]
+			strcpy(argvToInstall,mydrive);
+			argvToInstall[strlen(argvToInstall)-1]=0;
+			argvToInstallSize+=strlen(argvToInstall);
+			j=strlen(argvToInstall);
+		}
+		argvToInstall[j++]=str[i];
+	}
+	if(!strchr(seps,str[strlen(str)-1]))argvToInstall[j++]=0;
+	return argvToInstall;
 }
 
 char *processlinker(const char *name){
@@ -760,6 +851,7 @@ int validateTM(struct tm *timeParts){
 
 bool slot2nds(){
 	if(IPCZ->NDSType<NDSi){
+		ram_lock();
 		disc_unmount();
 		sysSetCartOwner(BUS_OWNER_ARM7);
 		bootMoonlight(0x080000c0);
@@ -868,6 +960,8 @@ int GetRunningMode(){
 bool readFrontend(char *target){
 	if(*argname){strcpy(target,argname);return true;}
 
+	//strcpy(target,mydrive);target[strlen(target)-1]=0;
+	strcpy(target,"");
 	FILE *f=fopen("/loadfile.dat","rb");
 	if(f){
 		int i=0;
@@ -876,7 +970,7 @@ bool readFrontend(char *target){
 		unlink("/loadfile.dat");
 		if(!memcmp((char*)libprism_buf,"//",2))i+=1;
 		if(!memcmp((char*)libprism_buf,"/./",3))i+=2; //menudo dir handling is buggy?
-		strcpy(target,(char*)libprism_buf+i);
+		strcat(target,(char*)libprism_buf+i);
 		return true;
 	}
 	f=fopen("/plgargs.dat","rb");
@@ -888,16 +982,16 @@ bool readFrontend(char *target){
 		unlink("/plgargs.dat");
 		//if(!memcmp((char*)libprism_buf,"//",2))i+=1;
 		//if(!memcmp((char*)libprism_buf,"/./",3))i+=2;
-		strcpy(target,(char*)libprism_buf); //+i);
+		strcat(target,(char*)libprism_buf); //+i);
 		return true;
 	}
-	f=fopen("/moonshl2/extlink.dat","r+b");
+	f=fopen("/moonshl2/extlink.dat\0in\0","r+b"); //make it modifiable externally
 	if(f){
 		TExtLinkBody extlink;
 		memset(&extlink,0,sizeof(TExtLinkBody));
 		fread(&extlink,1,sizeof(TExtLinkBody),f);
 		if(extlink.ID!=ExtLinkBody_ID){fclose(f);return false;}
-		ucs2tombs(target,extlink.DataFullPathFilenameUnicode);
+		ucs2tombs(target+strlen(target),extlink.DataFullPathFilenameUnicode);
 		rewind(f);
 		fwrite("____",1,4,f);
 		fclose(f);
@@ -907,17 +1001,19 @@ bool readFrontend(char *target){
 }
 
 bool writeFrontend(const int frontend_type, const char *exe, const char *target){ //kinda void...
+#if 0
 	if(frontend_type==FRONTEND_ARGV){
 		strcpy(argname,target);
 		fpassarg=true;
 		return true;
 	}
+#endif
 	if(frontend_type==FRONTEND_LOADFILE){
 		FILE *f=fopen("/loadfile.dat","wb");
 		if(f){
 			char sfn[768];
 			getsfnlfn(target,sfn,NULL);
-			fputs(target,f);
+			fputs(strchr(target,'/'),f);
 			fputs("\n",f);
 			fputs(sfn,f);
 			fputs("\n",f);
@@ -930,14 +1026,14 @@ bool writeFrontend(const int frontend_type, const char *exe, const char *target)
 		if(f){
 			fputs(exe,f);
 			fputs("\n",f);
-			fputs(target,f);
+			fputs(strchr(target,'/'),f);
 			fputs("\n",f);
 			fclose(f);
 			return true;
 		}
 	}
 	if(frontend_type==FRONTEND_EXTLINK){
-		FILE *f=fopen("/moonshl2/extlink.dat","wb");
+		FILE *f=fopen("/moonshl2/extlink.dat\0out\0","wb");
 		if(f){
 			TExtLinkBody extlink;
 			memset(&extlink,0,sizeof(TExtLinkBody));
@@ -958,7 +1054,7 @@ bool writeFrontend(const int frontend_type, const char *exe, const char *target)
 }
 
 void clearExtlink(){ //altloader should call this...
-	FILE *f=fopen("/moonshl2/extlink.dat","r+b"); //no truncate
+	FILE *f=fopen("/moonshl2/extlink.dat\0in\0","r+b"); //no truncate
 	if(f){
 		fwrite("____",1,4,f);
 		fclose(f);
@@ -976,3 +1072,16 @@ void getExtlinkWrapperLoaderName(char *loader){
 	ini_gets("mshl2wrap",dldiid,MOONSHELL,loader,256*3,"/moonshl2/extlink/mshl2wrap.ini");
 }
 
+void nocashMessageSafe(const char *s){
+#ifdef _LIBNDS_MINOR_
+	const int LENGTH=112;
+	int i=0,c;
+	for(;i+LENGTH<strlen(s);i+=LENGTH){
+		c=s[i+LENGTH];
+		((char*)s)[i+LENGTH]=0;
+		nocashMessage(s+i);
+		((char*)s)[i+LENGTH]=c;
+	}
+	nocashMessage(s+i);
+#endif
+}

@@ -10,6 +10,12 @@ cd ../..
 cd akysload/source
 make clean
 cd ../..
+cd argvloader/source
+make clean
+cd ../..
+cd argvview/source
+make clean
+cd ../..
 cd dldicaptor/source
 make clean
 cd ../..
@@ -67,6 +73,9 @@ cd ../..
 cd r4dump/source
 make clean
 cd ../..
+cd reset_ievo/source
+make clean
+cd ../..
 cd reset_m3/source
 make clean
 cd ../..
@@ -92,6 +101,9 @@ cd ttloader/source
 make clean
 cd ../..
 cd vhbootlib/source
+make clean
+cd ../..
+cd wdayloader/source
 make clean
 cd ../..
 cd woodload/source

@@ -344,12 +344,12 @@ NOINLINE void EnDecryptSecureArea(const char *ndsfilename, char endecrypt_option
 		{
 			int i;
 
-			if(encrypt_arm9(*(u32 *)header.gamecode, data)){fclose(fNDS);return;}
+			if(encrypt_arm9(read32(header.gamecode), data)){fclose(fNDS);return;}
 			header.secure_area_crc = swiCRC16(0xffff, data, 0x4000);
 			header.header_crc = CalcHeaderCRC(header);
 	
-			init0(*(u32 *)header.gamecode);
-			//srand(*(u32 *)header.gamecode);
+			init0(read32(header.gamecode));
+			//srand(read32(header.gamecode));
 	
 			// clear data after header - will break DSi
 			//fseek(fNDS, 0x200, SEEK_SET);
@@ -412,7 +412,7 @@ NOINLINE void EnDecryptSecureArea(const char *ndsfilename, char endecrypt_option
 		else
 		{
 			int i;
-			if(decrypt_arm9(*(u32 *)header.gamecode, data)){fclose(fNDS);return;}
+			if(decrypt_arm9(read32(header.gamecode), data)){fclose(fNDS);return;}
 	
 			// clear data after header
 			//fseek(fNDS, 0x200, SEEK_SET);

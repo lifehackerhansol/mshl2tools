@@ -1,6 +1,7 @@
 #include "../../libprism/libprism.h"
 #include "nds_mshl2wrap_nds.h"
 const u16 bgcolor=RGB15(10,10,0);
+const int useARM7Bios=0;
 
 int getmshl2wrap(u8 **mshl2wrap){
 	//char s[768];

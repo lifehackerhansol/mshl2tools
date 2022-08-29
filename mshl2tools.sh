@@ -4,7 +4,7 @@ dldi_m3r4 dldi_mati dldi_ez5v2 dldicaptor dlditest linktemplate \
 mshl2wrap ndslink iniclear inilink ak2loader akaioms2 akaioysl akysload m3loader r4loader dscoverloader \
 reset_mse reset_m3 reset_r4 resetproxy m3sakura_boot favlauncher favlauncher_bl favlauncher_ms \
 ysall vhbootlib savbackup m3region xenofile nds_backup_tool_memory yswood woodload fwrecovery nesdswrap \
-memdump stripmbr ttloader r4dump reset_mse_arco
+memdump stripmbr ttloader r4dump reset_mse_arco argvview argvloader reset_ievo wdayloader
 
 #: << "#INTERNAL"
 rm -f mshl2tools_DSEM.7z
@@ -54,6 +54,8 @@ rm -f mshl2tools_internal.7z
 mkdir internal
 mkdir internal/_dstwo
 mkdir internal/_ismart
+mkdir internal/fishell2
+mkdir internal/fishell2/extlink
 mkdir internal/moonshl2
 mkdir internal/moonshl2/extlink
 mkdir internal/moonshl2/resetmse
@@ -64,10 +66,14 @@ mkdir internal/d_system/loaders
 mkdir internal/tool
 mkdir internal/system
 mkdir internal/YSMenu
+mkdir internal/app
 cp -f ak2loader/nds.ak2loader.nds internal/moonshl2/extlink/
 cp -f akaioms2/nds.akaioms2.nds internal/moonshl2/extlink/
 cp -f akaioysl/akloader.nds internal/YSMenu/
 #cp -f akysload/akloader.nds internal/YSMenu/
+cp -f argvloader/arg.argvloader.nds internal/moonshl2/extlink/
+cp -f argvloader/argv.argvloader.nds internal/moonshl2/extlink/
+cp -f argvview/argvview.nds internal/tool/
 cp -f bootlib/bootloader/boot.bin internal/
 cp -f bootlib/bootstub/bootstub.bin internal/
 cp -f dldicaptor/dldicaptor.nds internal/tool/
@@ -98,6 +104,8 @@ cp -f m3sakura_boot/m3sakura.nds internal/
 cp -f m3region/m3region.nds internal/tool/
 cp -f memdump/memdump.nds internal/tool/
 cp -f mshl2wrap/nds.mshl2wrap.nds internal/moonshl2/extlink/
+cp -f mshl2wrap/nds.mshl2wrap.nds internal/fishell2/extlink/
+binreplace internal/fishell2/extlink/nds.mshl2wrap.nds //moonshl2//extlink.dat/0in/0 //fishell2//extlink.dat/0in/0
 cp -f ndslink/ndslink.nds internal/tool/
 cp -f nesdswrap/nes.nesdswrap.nds internal/moonshl2/extlink/
 cp -f r4dump/r4dump.nds internal/tool/
@@ -111,9 +119,11 @@ cp -f reset_mse/moonshl2alt.nds internal/moonalt.nds
 cp -f reset_mse/menu.xx internal/system/
 cp -f reset_m3/M3DS.nds internal/moonshl2/resetmse/
 cp -f reset_r4/R4TF.nds internal/moonshl2/resetmse/
+cp -f reset_ievo/CEVO.nds internal/
 cp -f resetproxy/reset.mse internal/moonshl/plugin/
 cp -f savbackup/savbackup.nds internal/tool/
 cp -f vhbootlib/_vh.bootlib.nds internal/moonshl2/extlink/
+cp -f wdayloader/wdayloader.nds internal/app/
 cp -f woodload/woodload.nds internal/YSMenu/
 cp -f xenofile/xenofile_02000000.nds internal/
 cp -f xenofile/xenofile_02000000.nds internal/boot.nds

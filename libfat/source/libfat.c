@@ -155,7 +155,7 @@ bool fatInit (uint32_t cacheSize, bool setAsDefaultDevice) {
 			// The first device to successfully mount is set as the default
 			if (defaultDevice < 0) {
 				defaultDevice = i;
-				break; ///
+				break; /// don't try to mound sd:/ if fat:/ was mounted successfully.
 			}
 		}
 	}
@@ -212,7 +212,7 @@ void fatGetVolumeLabel (const char* name, char *label) {
 		return;
 
 	namelen = strlen(name);
-	buf=(char*)_FAT_mem_allocate(sizeof(char)*namelen+2);	
+	buf=(char*)_FAT_mem_allocate(sizeof(char)*namelen+2);
 	strcpy(buf,name);
 
 	if (name[namelen-1] == '/') {

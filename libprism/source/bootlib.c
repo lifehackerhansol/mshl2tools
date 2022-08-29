@@ -186,15 +186,17 @@ void runNds(const char* filename, u32 cluster/*, bool initDisc, bool dldiPatchNd
 if(*(vu16*)VRAM_C>=5){ //bootlib v2 with ARGV
 	//set argv
 	u32 arg=align4( (u32)VRAM_C+readAddr((data_t*)VRAM_C+0x10) );
-	vramcpy((u16*)arg,"fat:",2);
-	vramcpy(((u16*)arg)+2,filename,align2(strlen(filename))/2);
+	//vramcpy((u16*)arg,"fat:",2);
+	//vramcpy(((u16*)arg)+2,filename,align2(strlen(filename))/2);
+	if(!argvToInstall)makeargv(filename);
+	installargv(NULL,(char*)arg);
 	writeAddr((data_t*)VRAM_C+0x10, arg-(u32)VRAM_C);
-	writeAddr((data_t*)VRAM_C+0x14, strlen(filename)+5);
+	writeAddr((data_t*)VRAM_C+0x14, argvToInstallSize);
 	//if(fpassarg){}
 }
 
 if(*(vu16*)VRAM_C>=6){ //bootlib v3 with DSi SD
-	writeAddr((data_t*)VRAM_C+0x1c, 0); // sorry but sd:/ not supported currently.
+	writeAddr((data_t*)VRAM_C+0x1c, !strcmp(mydrive,"fat:/")?0:1);
 }
 
 /*

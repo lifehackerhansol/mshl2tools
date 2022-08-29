@@ -197,8 +197,8 @@ fail:
 
 #if defined(ARM9) || defined(ARM7)
 int openpatch_single(const char *arg){
-	if(!strcpy_safe(buf,findpath(6,(char*[]){"/","/_dstwoplug/","/ismartplug/","/_iMenu/_ini/","/_plugin_/",mypath},"GameList.txt"))){printf("not found GameList.txt\n");return -1;}
-	return _openpatch_single(buf,arg);
+	if(!strcpy_safe(libprism_cbuf,findpath(6,(char*[]){"/","/_dstwoplug/","/ismartplug/","/_iMenu/_ini/","/_plugin_/",mypath},"GameList.txt"))){printf("not found GameList.txt\n");return -1;}
+	return _openpatch_single(libprism_cbuf,arg);
 }
 #else
 int openpatch_single(const int argc, const char **argv){

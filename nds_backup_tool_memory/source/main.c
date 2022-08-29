@@ -1,6 +1,7 @@
 #include "../../libprism/libprism.h"
 #include "libcarddump.h"
 const u16 bgcolor=RGB15(4,0,12);
+const int useARM7Bios=1;
 
 char	*data;
 
@@ -23,7 +24,7 @@ void dumpstart(){
 		if(IPCZ->keysdown&KEY_A)break;
 		if(IPCZ->keysdown&KEY_B)IPCZ->cmd=Shutdown;
 	}
-	dump.romID = Card_Open(key_tbl);
+	dump.romID = Card_Open((u8*)key_tbl);
 	while(dump.romID == 0xFFFFFFFF){
 		_consolePrintOnce("Cannot be recognized. Insert again.");
 		for(swiWaitForVBlank();;swiWaitForVBlank()){
@@ -74,7 +75,7 @@ void dumpnext(){
 		if(IPCZ->keysdown&KEY_A)break;
 		if(IPCZ->keysdown&KEY_B)IPCZ->cmd=Shutdown;
 	}
-	u32 romID = Card_Open(key_tbl);
+	u32 romID = Card_Open((u8*)key_tbl);
 	while(romID != dump.romID){
 		if(romID==0xFFFFFFFF){
 			_consolePrintOnce("Cannot be recognized. Insert again.");
@@ -113,7 +114,7 @@ void writestart(){
 		if(IPCZ->keysdown&KEY_A)break;
 		if(IPCZ->keysdown&KEY_B)IPCZ->cmd=Shutdown;
 	}
-	u32 romID = Card_Open(key_tbl);
+	u32 romID = Card_Open((u8*)key_tbl);
 	bool fatinited=false;
 	while(romID == 0xFFFFFFFF && !(fatinited=disc_mount())){
 		_consolePrintOnce("Cannot be recognized. Insert again.");
@@ -170,7 +171,7 @@ void writenext(){
 		if(IPCZ->keysdown&KEY_A)break;
 		if(IPCZ->keysdown&KEY_B)IPCZ->cmd=Shutdown;
 	}
-	u32 romID = Card_Open(key_tbl);
+	u32 romID = Card_Open((u8*)key_tbl);
 	bool fatinited=false;
 	while(romID == 0xFFFFFFFF && !(fatinited=disc_mount())){
 		_consolePrintOnce("Cannot be recognized. Insert again.");

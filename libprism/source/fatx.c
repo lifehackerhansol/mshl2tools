@@ -32,6 +32,9 @@ __handle* __get_handle(int);
 #if defined(LIBFAT) && defined(LIBELM)
 #error both LIBFAT and LIBELM are defined
 #elif defined(LIBFAT)
+size_t _FAT_directory_mbstoucs2 (u16* dst, const char* src, size_t len);
+size_t _FAT_directory_ucs2tombs (char* dst, const u16* src, size_t len);
+
 // Directory entry offsets
 enum DIR_ENTRY_offset {
 	DIR_ENTRY_name = 0x00,
@@ -211,26 +214,29 @@ static u32 _FAT_fat_clusterToSector(PARTITION* partition, u32 cluster){
 
 void mbstoucs2(u16* dst, const char* src){_FAT_directory_mbstoucs2(dst,src,256);}
 void ucs2tombs(char* dst, const u16* src){_FAT_directory_ucs2tombs(dst,src,768);}
-u32  getPartitionHandle(){return (u32)_FAT_partition_getPartitionFromPath("fat:/");}
+u32  getPartitionHandle(){return (u32)_FAT_partition_getPartitionFromPath(mydrive);}
 u32  nextCluster(u32 handle, u32 cluster){return _FAT_fat_nextCluster((PARTITION*)handle,cluster);}
 
 u32 getFatDataPointer(){ //for getTrueSector
-	PARTITION *p=_FAT_partition_getPartitionFromPath("fat:/");
+	PARTITION *p=_FAT_partition_getPartitionFromPath(mydrive);
 	if(p->bytesPerSector!=512||p->sectorsPerCluster!=64){_consolePrint("getFatDataPointer() will be useless if bytesPerSector!=512 || sectorsPerCluster!=64.\n");die();}
 	return p->dataStart-128; //back 2 clusters
 }
 
-void getsfnlfn(const char *path,char *sfn,u16 *lfn){ //path should be in UTF8
+void getsfnlfn(const char *_path,char *sfn,u16 *lfn){ //path should be in UTF8
 	static char buf[256*3],ret[256*3];
 	int i=1,len;
 	FILE_STRUCT *fs;
 	int fd;
 
-	if(!path)return;
+	if(!_path)return;
+	if(!strchr(_path,'/'))return;
 	if(!sfn&&!lfn)return;
 	memset(&buf,0,256*3);
 	memset( sfn,0,256);
 	memset(&ret,0,256*3);
+	const char *path=_path;
+	for(;*path!='/';path++);
 	//if(!memcmp(path,"/./",3))path+=2;
 	len=strlen(path);
 	for(;i<=len;i++){
@@ -310,7 +316,7 @@ void getsfnlfn(const char *path,char *sfn,u16 *lfn){ //path should be in UTF8
 }
 
 u64 fgetFATEntryAddress(int fd){ //only for R4 B4command //Working but still beta, I think
-	PARTITION *p=_FAT_partition_getPartitionFromPath("fat:/");
+	PARTITION *p=_FAT_partition_getPartitionFromPath(mydrive);
 	if(!p)return 0;
 
 	FILE_STRUCT *fs;
@@ -337,7 +343,7 @@ u64 getFATEntryAddress(const char *path){
 }
 
 u32 fgetSector(int fd){
-	PARTITION *p=_FAT_partition_getPartitionFromPath("fat:/");
+	PARTITION *p=_FAT_partition_getPartitionFromPath(mydrive);
 	if(!p)return 0;
 	struct stat st;
 	if(fstat(fd,&st))return 0;
@@ -355,7 +361,7 @@ u32 getSector(const char *path){
 int fgetFragments(int fd){ //based on MoonShell source code
 	int ret=0;
 	u32 clust,tmp;
-	PARTITION *p=_FAT_partition_getPartitionFromPath("fat:/");
+	PARTITION *p=_FAT_partition_getPartitionFromPath(mydrive);
 	if(!p)return -1;
 	struct stat st;
 	if(fstat(fd,&st))return -1;
@@ -376,7 +382,7 @@ int getFragments(const char *path){
 }
 
 int writePartitionInfo(type_printf writer){
-	PARTITION *p=_FAT_partition_getPartitionFromPath("fat:/");
+	PARTITION *p=_FAT_partition_getPartitionFromPath(mydrive);
 	if(!p||!writer)return -1;
 	writer(
 		"filesysType:        %s\n"
@@ -485,18 +491,23 @@ int libprism_chattr(const char *path, u8 attr){
 }
 
 u32 getSectors(){
-	PARTITION *p=_FAT_partition_getPartitionFromPath("fat:/");
+	PARTITION *p=_FAT_partition_getPartitionFromPath(mydrive);
 	if(!p)return 0;
 	return p->numberOfSectors;
 }
 
 bool disc_mount(){
-	return fatInitDefault();
+	bool ret = fatInitDefault();
+	if(ret){
+		getcwd(mydrive,12);
+		if(!strcmp(mypath,"/"))strcpy(mypath,mydrive);
+	}
+	return ret;
 }
 
 void disc_unmount(){ //You must call this before softreset; otherwise fsinfo will got messed up.
 #ifdef _LIBNDS_MAJOR_
-	fatUnmount("fat:/");
+	fatUnmount(mydrive);
 #else
 	fatUnmount(0);
 #endif
@@ -505,8 +516,11 @@ void disc_unmount(){ //You must call this before softreset; otherwise fsinfo wil
 }
 
 #elif defined(LIBELM)
+DWORD get_fat(FATFS *fs, DWORD clst);
+DWORD clust2sect(FATFS *fs, DWORD clst);
+
 u32 UTCToDosTime(const u32 timer){
-	struct tm *t=localtime(&timer);
+	struct tm *t=localtime((time_t*)&timer);
 	return (u32)(
 		((t->tm_year-80)<<25) |
 		((t->tm_mon+1)<<21) |
@@ -650,7 +664,7 @@ int writePartitionInfo(type_printf writer){
 	if(!p||!writer)return -1;
 
 	u32 free_clusters=0;
-	f_getfree("\0",&free_clusters,&p);
+	f_getfree((TCHAR*)"\0",(DWORD*)&free_clusters,&p);
 	writer(
 		"filesysType:        %s\n"
 		"totalSize:          %dK\n"
@@ -720,7 +734,12 @@ u32 getSectors(){
 }
 
 bool disc_mount(){
-	return ELM_Mount();
+	bool ret = ELM_Mount();
+	if(ret){
+		getcwd(mydrive,12);
+		if(!strcmp(mypath,"/"))strcpy(mypath,mydrive);
+	}
+	return ret;
 }
 
 void disc_unmount(){ //You must call this before softreset; otherwise fsinfo will got messed up.
@@ -732,4 +751,3 @@ void disc_unmount(){ //You must call this before softreset; otherwise fsinfo wil
 #else
 #error define one of LIBFAT / LIBELM
 #endif
-

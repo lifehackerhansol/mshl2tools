@@ -109,10 +109,10 @@ bool BootNDSROMex2(const char *pFilename,const int bypassYSMenu,const char* dump
 	_consolePrint("Trying to load file\n");
 
 	//modified by X: Use 0x02fffe00 rather than IPC TARMInfo.
-	u32 *header=memUncachedAddr(0x02fffe00);
+	vu32 *header=memUncachedAddr(0x02fffe00);
 	{
 		//u32 header[0x40/4];
-		fread(header,1,0x200,FileHandle);
+		fread((u32*)header,1,0x200,FileHandle);
 
 		//volatile TARMInfo *pai=&IPCZ->ARMInfo7;
 		//pai->pCopyFrom=(void*)header[0x30/4];
@@ -121,7 +121,7 @@ bool BootNDSROMex2(const char *pFilename,const int bypassYSMenu,const char* dump
 		//pai->ExecAddr=header[0x34/4];
 		//_consolePrintf("ARM7 CopyFrom=0x%08x, CopyTo=0x%08x, CopySize=%dbyte, ExecAddr=0x%08x.¥n",pai->pCopyFrom,pai->pCopyTo,pai->CopySize,pai->ExecAddr);
 		fseek(FileHandle,header[0x30/4],SEEK_SET);
-		header[0x30/4]=(u32*)malloc(header[0x3c/4]);
+		header[0x30/4]=(u32)malloc(header[0x3c/4]);
 		if(header[0x30/4]==0){_consolePrintf("Large ARM7 binary size. %dbyte.\n",header[0x3c/4]);die();}
 		fread((u32*)header[0x30/4],1,header[0x3c/4],FileHandle);
 		_consolePrintf("ARM7: ptr=%08x.\n",header[0x30/4]);
@@ -129,12 +129,12 @@ bool BootNDSROMex2(const char *pFilename,const int bypassYSMenu,const char* dump
 		//pai=&IPCZ->ARMInfo9;
 		//pai->pCopyFrom=(void*)header[0x20/4];
 		///// It seems that moonshell2load.arm.c requires uncached memory address although I did DC_InvalidateAll(). Cached address handling is worse than RVDS? /////
-		header[0x28/4] = memUncachedAddr(header[0x28/4]); //pai->pCopyTo=memUncached( (void*)header[0x28/4] );
+		header[0x28/4] = (u32)memUncachedAddr(header[0x28/4]); //pai->pCopyTo=memUncached( (void*)header[0x28/4] );
 		//pai->CopySize=header[0x2c/4];
 		//pai->ExecAddr=header[0x24/4];
 		//_consolePrintf("ARM9 CopyFrom=0x%08x, CopyTo=0x%08x, CopySize=%dbyte, ExecAddr=0x%08x.¥n",pai->pCopyFrom,pai->pCopyTo,pai->CopySize,pai->ExecAddr);
 		fseek(FileHandle,header[0x20/4],SEEK_SET);
-		header[0x20/4]=malloc(header[0x2c/4]);
+		header[0x20/4]=(u32)malloc(header[0x2c/4]);
 		if(header[0x20/4]==0){_consolePrintf("Large ARM9 binary size. %dbyte.\n",header[0x2c/4]);die();}
 		fread((u32*)header[0x20/4],1,header[0x2c/4],FileHandle);
 		_consolePrintf("ARM9: ptr=%08x, to=%08x.\n",header[0x20/4],header[0x28/4]);
@@ -163,7 +163,8 @@ bool BootNDSROMex2(const char *pFilename,const int bypassYSMenu,const char* dump
 	}
 	disc_unmount();
 	_consolePrint("Rebooting...\n");
-	installargv((u8*)header,(char*)0x02fff400,pFilename);
+	if(!argvToInstall)makeargv(pFilename);
+	installargv((u8*)header,(char*)0x02fff400);
 
 	//actual reset
 	BootNDSROMex_final();
