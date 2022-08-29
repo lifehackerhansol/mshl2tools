@@ -17,7 +17,7 @@ export TOPDIR		:=	$(CURDIR)
 #---------------------------------------------------------------------------------
 export PATH		:=	$(DEVKITARM)/bin:$(PATH)
 
-.PHONY: $(TARGET).arm7 $(TARGET).arm9
+.PHONY: $(TARGET).arm9
 
 #---------------------------------------------------------------------------------
 # main targets
@@ -25,22 +25,21 @@ export PATH		:=	$(DEVKITARM)/bin:$(PATH)
 all: $(TARGET).nds
 linkmaker: linkmaker.c
 	gcc -O2 -o linkmaker linkmaker.c
+#guidpatch: guidpatch.c
+#	gcc -O2 -o guidpatch guidpatch.c
 
 #$(TARGET).ds.gba	: $(TARGET).nds
 
 #---------------------------------------------------------------------------------
-$(TARGET).nds	:	$(TARGET).arm7 $(TARGET).arm9 linkmaker
-	ndstool	-c $(TARGET).nds -7 $(TARGET).arm7 -9 $(TARGET).arm9 -b $(TARGET).bmp "MoonShell2 Link;Launcher based on;reset_mse_06b_for_ak2"
+$(TARGET).nds	:	$(TARGET).arm9 linkmaker
+	ndstool	-c $(TARGET).nds -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -b $(TARGET).bmp "MoonShell2 Link;Launcher based on;reset_mse_06b_for_ak2"
 	linkmaker $(TARGET).nds
 	cp	$(TARGET).nds ../
 
 #---------------------------------------------------------------------------------
-$(TARGET).arm7	: arm7/$(TARGET).elf
 $(TARGET).arm9	: arm9/$(TARGET).elf
 
 #---------------------------------------------------------------------------------
-arm7/$(TARGET).elf:
-	$(MAKE) -C arm7
 	
 #---------------------------------------------------------------------------------
 arm9/$(TARGET).elf:
@@ -49,5 +48,4 @@ arm9/$(TARGET).elf:
 #---------------------------------------------------------------------------------
 clean:
 	$(MAKE) -C arm9 clean
-	$(MAKE) -C arm7 clean
-	rm -f $(TARGET).ds.gba $(TARGET).nds $(TARGET).arm7 $(TARGET).arm9 linkmaker
+	rm -f $(TARGET).ds.gba $(TARGET).nds $(TARGET).arm9 linkmaker guidpatch

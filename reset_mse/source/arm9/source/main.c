@@ -7,7 +7,7 @@
 #include "_console.h"
 #include "maindef.h"
 #include "_const.h"
-#include "../../ipcex.h"
+#include "../../../../arm7/ipcz.h"
 //#include "linkreset_arm9.h"
 
 #include "dldi.h"
@@ -47,7 +47,7 @@ int main(void) {
   SetARM9_REG_WaitCR();
   
   irqInit();
-  //fifoInit();
+  fifoInit();
   //REG_IPC_FIFO_CR |= IPC_FIFO_SEND_CLEAR;
   //REG_IPC_FIFO_CR &= ~IPC_FIFO_SEND_CLEAR;
   REG_IME=0;
@@ -62,8 +62,6 @@ int main(void) {
     void SoftReset(void);
     SoftReset();
   }
-  
-  while(1);
 }
 
 void InitVRAM(void)
@@ -119,17 +117,25 @@ void InitVRAM(void)
 int wait=0;
 void timer(){wait=1;}
 
+void die(){
+	extern char *fake_heap_end;
+	for(swiWaitForVBlank();;swiWaitForVBlank())
+		if(!( ((~REG_KEYINPUT)&0x3ff) | ((IPCZ->keyxy&0x3)<<10) | ((IPCZ->keyxy&0x40/*0xc0*/)<<6) ))break;
+	if(*(u64*)fake_heap_end==0x62757473746F6F62ULL){
+		_consolePrintf("Press A to return to menu.\n");
+		for(swiWaitForVBlank();;swiWaitForVBlank())
+			if(KEY_A&( ((~REG_KEYINPUT)&0x3ff) | ((IPCZ->keyxy&0x3)<<10) | ((IPCZ->keyxy&0x40/*0xc0*/)<<6) ))
+				exit(0);
+	}else{
+		_consolePrintf("Press A to shutdown.\n");
+		for(swiWaitForVBlank();;swiWaitForVBlank())
+			if(KEY_A&( ((~REG_KEYINPUT)&0x3ff) | ((IPCZ->keyxy&0x3)<<10) | ((IPCZ->keyxy&0x40/*0xc0*/)<<6) ))
+				IPCZ->cmd=Shutdown;
+	}
+}
+
 void SoftReset(void)
 {
-#if 0	// change 2008.03.30 kzat3
-  //const char *pname=MSEINFO.AdapterName;
-  //_consolePrintf("go to farmware menu. [%s]\n",pname);
-#else
-  //_consolePrintf("dldi version\n");
-#endif
-
-	ERESET RESET=RESET_NULL;
-
 	char file[256*3]="MoonShellExecute\0\0\0\0\0\0\0\0\0\0\0" //will be modified externally
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
@@ -157,6 +163,7 @@ void SoftReset(void)
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"; //744 paddings
 
+	IPCZ->cmd=0;
 	_consolePrintf(
 		"MoonShellExecute Soft Reset DLDI\n"
 		"reset_mse_06b_for_ak2 by Moonlight, Rudolph, kzat3\n"
@@ -167,7 +174,7 @@ void SoftReset(void)
 
 	{
 		unsigned char dldiid[5];
-		unsigned char *dldiFileData=((u32*)(&_io_dldi))-24;
+		unsigned char *dldiFileData=io_dldi_data;
 		memcpy(dldiid,(char*)dldiFileData+ioType,4);
 		dldiid[4]=0;
 		_consolePrintf("DLDI ID: %s\n",dldiid);
@@ -179,7 +186,7 @@ void SoftReset(void)
 	//_consolePrintf("Done.\n");
 
 	_consolePrintf("initializing libfat... ");
-	if(!fatInitDefault()){_consolePrintf("failed.\n");while(1);}
+	if(!fatInitDefault()){_consolePrintf("failed.\n");die();}
 	_consolePrintf("done.\n");
 
 	// vvvvvvvvvvv add 2008.03.30 kzat3
@@ -188,15 +195,15 @@ void SoftReset(void)
 		_consolePrintf("allocate done.\n");
 	} else {
 		_consolePrintf("allocate failed.\n");
-		while(1);
+		die();
 	}
-	RESET=RESET_MENU_GEN;
-	IPCEX->RESET=RESET;
-       //fifoSendValue32(FIFO_USER_07,1);
+
+       IPCZ->cmd=ResetRudolph;
+	//fifoSendValue32(FIFO_USER_07,1);
 	_consolePrintf("rebooting... \n");
 	ret_menu9_GENs();
 	_consolePrintf("failed.\n");
-	while(1)swiWaitForVBlank();
+	die();
 	// ^^^^^^^^^^^^ add 2008.03.30 kzat3
 }
 

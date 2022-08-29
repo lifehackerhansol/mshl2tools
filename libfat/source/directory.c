@@ -25,39 +25,6 @@
  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- 
-	2006-08-14 - Chishm
-		* entryFromPath correctly finds "" and "." now
-		
-	2006-08-17 - Chishm
-		* entryFromPath doesn't look for "" anymore - use "." to refer to the current directory
-	
-	2006-08-19 - Chishm 
-		* Fixed entryFromPath bug when looking for "." in root directory
-		
-	2006-10-01 - Chishm
-		* Now clears the whole new cluster when linking in more clusters for a directory
-		
-	2006-10-28 - Chishm
-		* stat returns the hostType for the st_dev value
-		
-	2007-03-14 - Chishm
-		* Check long file names for buffer overflow
-		
-	2007-04-22 - Chishm
-		* Added space to list of illegal alias characters - fixes filename creation bug when filename contained a space
-	
-	2007-09-01 - Chishm
-		* Use CLUSTER_ERROR when an error occurs with the FAT, not CLUSTER_FREE
-	
-	2007-11-01 - Chishm
-		* Added unicode support
-		
-	2007-11-04 - Chishm
-		* Fixed alias creation bugs
-		
-	2007-11-16 - Chishm
-		* Fixed LFN creation with character codes > 0x7F
 */
 
 #include <string.h>
@@ -65,6 +32,7 @@
 #include <wchar.h>
 #include <wctype.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "directory.h"
 #include "common.h"
@@ -79,8 +47,6 @@
 
 #define LAST_LFN_POS (19*13)
 #define LAST_LFN_POS_CORRECTION (MAX_LFN_LENGTH-15)
-
-//extern void _consolePrintf(const char* format, ...);
 
 typedef unsigned short ucs2_t;
 
@@ -105,19 +71,54 @@ enum LFN_offset {
 	LFN_offset_char11 = 0x1C,
 	LFN_offset_char12 = 0x1E
 };
-const int LFN_offset_table[13]={0x01,0x03,0x05,0x07,0x09,0x0E,0x10,0x12,0x14,0x16,0x18,0x1C,0x1E}; 
+static const int LFN_offset_table[13]={0x01,0x03,0x05,0x07,0x09,0x0E,0x10,0x12,0x14,0x16,0x18,0x1C,0x1E}; 
 
 #define LFN_END 0x40
 #define LFN_DEL 0x80
 
-const char ILLEGAL_ALIAS_CHARACTERS[] = "\\/:;*?\"<>|&+,=[] ";
-const char ILLEGAL_LFN_CHARACTERS[] = "\\/:*?\"<>|";
+static const char ILLEGAL_ALIAS_CHARACTERS[] = "\\/:;*?\"<>|&+,=[] ";
+static const char ILLEGAL_LFN_CHARACTERS[] = "\\/:*?\"<>|";
+
+/* 
+Returns number of UCS-2 characters needed to encode an LFN
+Returns -1 if it is an invalid LFN
+*/
+#define ABOVE_UCS_RANGE 0xF0
+static int _FAT_directory_lfnLength (const char* name) {
+	unsigned int i;
+	size_t nameLength;
+	int ucsLength;
+	const char* tempName = name;
+	
+	nameLength = strnlen(name, MAX_FILENAME_LENGTH);
+	// Make sure the name is short enough to be valid
+	if ( nameLength >= MAX_FILENAME_LENGTH) {
+		return -1;
+	}
+	// Make sure it doesn't contain any invalid characters
+	if (strpbrk (name, ILLEGAL_LFN_CHARACTERS) != NULL) {
+		return -1;
+	}
+	// Make sure the name doesn't contain any control codes or codes not representable in UCS-2
+	for (i = 0; i < nameLength; i++) {
+		if (name[i] < 0x20 || name[i] >= ABOVE_UCS_RANGE) {
+			return -1;
+		}
+	}
+	// Convert to UCS-2 and get the resulting length
+	ucsLength = mbsrtowcs(NULL, &tempName, MAX_LFN_LENGTH, NULL);
+	if (ucsLength < 0 || ucsLength >= MAX_LFN_LENGTH) {
+		return -1;
+	}
+	
+	// Otherwise it is valid
+	return ucsLength;
+}
 
 /*
 Convert a multibyte encoded string into a NUL-terminated UCS-2 string, storing at most len characters
 return number of characters stored
 */
-/*
 size_t _FAT_directory_mbstoucs2 (ucs2_t* dst, const char* src, size_t len) {
 	mbstate_t ps = {0};
 	wchar_t tempChar;
@@ -141,100 +142,11 @@ size_t _FAT_directory_mbstoucs2 (ucs2_t* dst, const char* src, size_t len) {
 
 	return count;
 }
-*/
-size_t _FAT_directory_mbstoucs2(unsigned short* dst, const unsigned char* src, size_t len) {
-	size_t i=0,j=0;
-	for(;src[i];){
-		if((src[i]&0x80) == 0x00){
-			if(!dst)j++;else{
-				if(len-j<2)break;
-				dst[j++] = ((src[i  ] & 0x7f)     );
-			}
-			i++;
-		}else if ((src[i] & 0xe0) == 0xc0 ){
-			if(!dst)j++;else{
-				if(len-j<2)break;
-				dst[j++] = ((src[i  ] & 0x3f) << 6)
-					  | ((src[i+1] & 0x3f)     );
-			}
-			i+=2;
-		}else if ((src[i] & 0xf0) == 0xe0 ){
-			if(!dst)j++;else{
-				if(len-j<2)break;
-				dst[j++] = ((src[i  ] & 0x0f) << 12)
-					  | ((src[i+1] & 0x3f) <<  6)
-					  | ((src[i+2] & 0x3f)      );
-			}
-			i+=3;
-		}else if ((src[i] & 0xf8) == 0xf0 ){
-			if(!dst)j+=2;else{
-				unsigned short z = ((src[i  ] & (unsigned short)0x03) <<  8)  // 2
-						   | ((src[i+1] & 0x3f) <<  2)  // 6
-						   | ((src[i+2] & 0x30) >>  4); // 2
-				if(len-j<2)break;
-				dst[j++] = (z-0x40) | 0xd800;
-				dst[j++] = ((src[i+2] & 0x0f) <<  6)           //4
-					  | ((src[i+3] & 0x3f)      ) | 0xdc00; //6
-			}
-			i+=4;
-		}else break; //cannot convert
-	}
-	if(dst)dst[j]=0;
-	return j;
-}
-
-#define mbrtowc _fat_mbrtowc
-size_t _fat_mbrtowc(unsigned short *dst, const unsigned char *src, size_t len, mbstate_t *ps){
-	size_t i=0,j=0;
-	int *x=(int*)ps;
-	if(!*src)return 0;
-	*x=0;
-	//for(;src[i];){
-		if((src[0]&0x80) == 0x00){
-			if(!dst)j++;else{
-				if(len<1)return -1;
-				dst[j++] = ((src[0] & 0x7f)     );
-			}
-			i++;
-		}else if ((src[0] & 0xe0) == 0xc0 ){
-			if(!dst)j++;else{
-				if(len<2)return -1;
-				dst[j++] = ((src[0] & 0x3f) << 6)
-					  | ((src[1] & 0x3f)     );
-			}
-			i+=2;
-		}else if ((src[0] & 0xf0) == 0xe0 ){
-			if(!dst)j++;else{
-				if(len<3)return -1;
-				dst[j++] = ((src[0] & 0x0f) << 12)
-					  | ((src[1] & 0x3f) <<  6)
-					  | ((src[2] & 0x3f)      );
-			}
-			i+=3;
-		}else if ((src[0] & 0xf8) == 0xf0 ){
-			if(!dst)j+=2;else{
-				unsigned short z = ((src[0] & (unsigned short)0x03) <<  8)  // 2
-						   | ((src[1] & 0x3f) <<  2)  // 6
-						   | ((src[2] & 0x30) >>  4); // 2
-				if(len<4)return -1;
-				dst[j++] = (z-0x40) | 0xd800;
-				dst[j++] = ((src[2] & 0x0f) <<  6)           //4
-					  | ((src[3] & 0x3f)      ) | 0xdc00; //6
-			}
-			i+=4;
-			*x=1;
-		}else return -1; //cannot convert
-	//}
-	//if(dst)dst[j]=0;
-	return i;
-}
-
 
 /*
 Convert a UCS-2 string into a NUL-terminated multibyte string, storing at most len chars
-return number of chars stored
+return number of chars stored, or (size_t)-1 on error
 */
-/*
 size_t _FAT_directory_ucs2tombs (char* dst, const ucs2_t* src, size_t len) {
 	mbstate_t ps = {0};
 	size_t count = 0;
@@ -242,7 +154,7 @@ size_t _FAT_directory_ucs2tombs (char* dst, const ucs2_t* src, size_t len) {
 	char buff[MB_CUR_MAX];
 	int i;
 	
-	while (count < len - 1 && src != '\0') {
+	while (count < len - 1 && *src != '\0') {
 		bytes = wcrtomb (buff, *src, &ps);
 		if (bytes < 0) {
 			return -1;
@@ -261,90 +173,12 @@ size_t _FAT_directory_ucs2tombs (char* dst, const ucs2_t* src, size_t len) {
 	
 	return count;
 }
-*/
-size_t _FAT_directory_ucs2tombs(unsigned char* dst, const unsigned short* src, size_t len) {
-	size_t i=0,j=0;
-	for (;src[i];i++){
-		if(src[i] <= 0x007f){
-			if(!dst)j++;else{
-				if(len-j<2)break;
-				dst[j++] = ((src[i] & 0x007f)      );
-			}
-		}else if(src[i] <= 0x07ff){
-			if(!dst)j+=2;else{
-				if(len-j<3)break;
-				dst[j++] = ((src[i] & 0x07c0) >>  6) | 0xc0;
-				dst[j++] = ((src[i] & 0x003f)      ) | 0x80;
-			}
-		}else if((src[i] & 0xdc00) == 0xd800 && (src[i+1] & 0xdc00) == 0xdc00){
-			if(!dst)j+=4;else{
-				unsigned short z = (src[i]&0x3ff)+0x40;
-				if(len-j<5)break;
-				dst[j++] = ((z      & 0x0300) >>  8) | 0xf0;   //2
-				dst[j++] = ((z      & 0x00fc) >>  2) | 0x80;   //6
-				dst[j++] = ((z      & 0x0003) <<  4)           //2
-					  | ((src[i+1] & 0x03c0) >>  6) | 0x80; //4
-				dst[j++] = ((src[i+1] & 0x003f)      ) | 0x80; //6
-			}i++;
-		}else{
-			if(!dst)j+=3;else{
-				if(len-j<4)break;
-				dst[j++] = ((src[i] & 0xf000) >> 12) | 0xe0;
-				dst[j++] = ((src[i] & 0x0fc0) >>  6) | 0x80;
-				dst[j++] = ((src[i] & 0x003f)      ) | 0x80;
-			}
-		}
-	}
-	if(dst)dst[j]=0;
-#if 0
-	_consolePrintf("---%02x%02x%02x%02x%02x%02x%02x%02x%02x %04x%04x\n",
-dst[0],dst[1],dst[2],dst[3],dst[4],dst[5],dst[6],dst[7],dst[8],src[0],src[1]);
-#endif
-	return j;
-}
-
-/* 
-Returns number of UCS-2 characters needed to encode an LFN
-Returns -1 if it is an invalid LFN
-*/
-#define ABOVE_UCS_RANGE 0xF0
-static int _FAT_directory_lfnLength (const char* name) {
-	u32 i;
-	u32 nameLength;
-	int ucsLength;
-	const char* tempName = name;
-	
-	nameLength = strnlen(name, MAX_FILENAME_LENGTH);
-	// Make sure the name is short enough to be valid
-	if ( nameLength >= MAX_FILENAME_LENGTH) {
-		return -1;
-	}
-	// Make sure it doesn't contain any invalid characters
-	if (strpbrk (name, ILLEGAL_LFN_CHARACTERS) != NULL) {
-		return -1;
-	}
-	// Make sure the name doesn't contain any control codes or codes not representable in UCS-2
-	for (i = 0; i < nameLength; i++) {
-		if (name[i] < 0x20 || name[i] >= ABOVE_UCS_RANGE) {
-			return -1;
-		}
-	}
-	// Convert to UCS-2 and get the resulting length
-	ucsLength = _FAT_directory_mbstoucs2(NULL, tempName, MAX_LFN_LENGTH);
-			//mbsrtowcs(NULL, &tempName, MAX_LFN_LENGTH, NULL);
-	if (ucsLength < 0 || ucsLength >= MAX_LFN_LENGTH) {
-		return -1;
-	}
-	
-	// Otherwise it is valid
-	return ucsLength;
-}
 
 /*
 Case-independent comparison of two multibyte encoded strings
 */
 static int _FAT_directory_mbsncasecmp (const char* s1, const char* s2, size_t len1) {
-	unsigned short wc1[2], wc2[2];
+	wchar_t wc1, wc2;
 	mbstate_t ps1 = {0};
 	mbstate_t ps2 = {0};
 	size_t b1 = 0;
@@ -355,24 +189,17 @@ static int _FAT_directory_mbsncasecmp (const char* s1, const char* s2, size_t le
 	}
 	
 	do {
-		wc1[0]=wc1[1]=wc2[0]=wc2[1]=0;
 		s1 += b1;
 		s2 += b2;
-		b1 = mbrtowc(wc1, s1, 4, &ps1);
-		b2 = mbrtowc(wc2, s2, 4, &ps2);
-//_consolePrintf("--%02x %02x %02x %02x %d %d\n",wc1[0],wc2[0],s1[0],s2[0],b1,b2);
-		if(b1 < 0 || b2 < 0){
+		b1 = mbrtowc(&wc1, s1, MB_CUR_MAX, &ps1);
+		b2 = mbrtowc(&wc2, s2, MB_CUR_MAX, &ps2);
+		if ((int)b1 < 0 || (int)b2 < 0) {
 			break;
 		}
 		len1 -= b1;
-		if(*((int*)&ps1)==1){
-			if(*((int*)&ps2)==0)break;
-			if(towlower(wc1[0]) != towlower(wc2[0]))return towlower(wc1[0]) - towlower(wc2[0]);
-			if(towlower(wc1[1]) != towlower(wc2[1]))return towlower(wc1[1]) - towlower(wc2[1]);
-		}
-	} while (len1 > 0 && towlower(wc1[0]) == towlower(wc2[0]) && wc1[0] != 0);
-//_consolePrintf("--%s %s %d\n",s1,s2,towlower(wc1[0]) - towlower(wc2[0]));
-	return towlower(wc1[0]) - towlower(wc2[0]);
+	} while (len1 > 0 && towlower(wc1) == towlower(wc2) && wc1 != 0);
+	
+	return towlower(wc1) - towlower(wc2);
 }
 
 
@@ -409,14 +236,18 @@ bool _FAT_directory_entryGetAlias (const u8* entryData, char* destName) {
 	return (destName[0] != '\0');
 }
 
-u32 _FAT_directory_entryGetCluster (const u8* entryData) {
-	return u8array_to_u16(entryData,DIR_ENTRY_cluster) | (u8array_to_u16(entryData, DIR_ENTRY_clusterHigh) << 16);
+uint32_t _FAT_directory_entryGetCluster (PARTITION* partition, const uint8_t* entryData) {
+	if (partition->filesysType == FS_FAT32) {
+		// Only use high 16 bits of start cluster when we are certain they are correctly defined
+		return u8array_to_u16(entryData,DIR_ENTRY_cluster) | (u8array_to_u16(entryData, DIR_ENTRY_clusterHigh) << 16);
+	} else {
+		return u8array_to_u16(entryData,DIR_ENTRY_cluster);
+	}
 }
 
 static bool _FAT_directory_incrementDirEntryPosition (PARTITION* partition, DIR_ENTRY_POSITION* entryPosition, bool extendDirectory) {
-	DIR_ENTRY_POSITION position;
-	position = *entryPosition;
-	u32 tempCluster;
+	DIR_ENTRY_POSITION position = *entryPosition;
+	uint32_t tempCluster;
 
 	// Increment offset, wrapping at the end of a sector
 	++ position.offset;
@@ -451,17 +282,12 @@ static bool _FAT_directory_incrementDirEntryPosition (PARTITION* partition, DIR_
 bool _FAT_directory_getNextEntry (PARTITION* partition, DIR_ENTRY* entry) {
 	DIR_ENTRY_POSITION entryStart;
 	DIR_ENTRY_POSITION entryEnd;
-
-	u8 entryData[0x20];
-	
+	uint8_t entryData[0x20];
 	ucs2_t lfn[MAX_LFN_LENGTH];
-
 	bool notFound, found;
-	u32 maxSectors;
 	int lfnPos;
-	u8 lfnChkSum, chkSum;
+	uint8_t lfnChkSum, chkSum;
 	bool lfnExists;
-
 	int i;
 
 	lfnChkSum = 0;
@@ -475,13 +301,6 @@ bool _FAT_directory_getNextEntry (PARTITION* partition, DIR_ENTRY* entry) {
 
 	entryEnd = entryStart;
 
-	// Can only be FAT16_ROOT_DIR_CLUSTER if it is the root directory on a FAT12 or FAT16 partition
-	if (entryStart.cluster == FAT16_ROOT_DIR_CLUSTER) {
-		maxSectors = partition->dataStart - partition->rootDirStart;
-	} else {
-		maxSectors = partition->sectorsPerCluster;
-	}
-
 	lfnExists = false;
 
 	found = false;
@@ -492,7 +311,9 @@ bool _FAT_directory_getNextEntry (PARTITION* partition, DIR_ENTRY* entry) {
 			notFound = true;
 		}
 
-		_FAT_cache_readPartialSector (partition->cache, entryData, _FAT_fat_clusterToSector(partition, entryEnd.cluster) + entryEnd.sector, entryEnd.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE);
+		_FAT_cache_readPartialSector (partition->cache, entryData,
+			_FAT_fat_clusterToSector(partition, entryEnd.cluster) + entryEnd.sector,
+			entryEnd.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE);
 
 		if (entryData[DIR_ENTRY_attributes] == ATTRIB_LFN) {
 			// It's an LFN
@@ -508,7 +329,8 @@ bool _FAT_directory_getNextEntry (PARTITION* partition, DIR_ENTRY* entry) {
 				}
 				lfn[lfnPos] = '\0';	// Set end of lfn to null character
 				lfnChkSum = entryData[LFN_offset_checkSum];
-			} if (lfnChkSum != entryData[LFN_offset_checkSum]) {
+			} 
+			if (lfnChkSum != entryData[LFN_offset_checkSum]) {
 				lfnExists = false;
 			}
 			if (lfnExists) {
@@ -540,7 +362,7 @@ bool _FAT_directory_getNextEntry (PARTITION* partition, DIR_ENTRY* entry) {
 			}
 			
 			if (lfnExists) {
-				if (_FAT_directory_ucs2tombs (entry->filename, lfn, MAX_FILENAME_LENGTH) < 0) {
+				if (_FAT_directory_ucs2tombs (entry->filename, lfn, MAX_FILENAME_LENGTH) == (size_t)-1) {
 					// Failed to convert the file name to UTF-8. Maybe the wrong locale is set?
 					return false;
 				}
@@ -564,7 +386,7 @@ bool _FAT_directory_getNextEntry (PARTITION* partition, DIR_ENTRY* entry) {
 	}
 }
 
-bool _FAT_directory_getFirstEntry (PARTITION* partition, DIR_ENTRY* entry, u32 dirCluster) {
+bool _FAT_directory_getFirstEntry (PARTITION* partition, DIR_ENTRY* entry, uint32_t dirCluster) {
 	entry->dataStart.cluster = dirCluster;
 	entry->dataStart.sector = 0;
 	entry->dataStart.offset = -1; // Start before the beginning of the directory
@@ -596,20 +418,58 @@ bool _FAT_directory_getRootEntry (PARTITION* partition, DIR_ENTRY* entry) {
 	return true;
 }
 
-bool _FAT_directory_entryFromPosition (PARTITION* partition, DIR_ENTRY* entry) {
-	DIR_ENTRY_POSITION entryStart;
+bool _FAT_directory_getVolumeLabel (PARTITION* partition, char *label) {
+	DIR_ENTRY entry;
 	DIR_ENTRY_POSITION entryEnd;
-	entryStart = entry->dataStart;
-	entryEnd = entry->dataEnd;
+	uint8_t entryData[DIR_ENTRY_DATA_SIZE];
+	int i;
+	bool end;
+
+	_FAT_directory_getRootEntry(partition, &entry);
+
+	entryEnd = entry.dataEnd;
+
+	// Make sure we are using the correct root directory, in case of FAT32
+	if (entryEnd.cluster == FAT16_ROOT_DIR_CLUSTER) {
+		entryEnd.cluster = partition->rootDirCluster;
+	}
+
+	label[0]='\0';
+	label[11]='\0';
+	end = false;
+	//this entry should be among the first 3 entries in the root directory table, if not, then system can have trouble displaying the right volume label
+	while(!end) {   
+		if (_FAT_directory_incrementDirEntryPosition (partition, &entryEnd, false) == false) {
+			end = true;
+		}
+
+		if(!_FAT_cache_readPartialSector (partition->cache, entryData,
+			_FAT_fat_clusterToSector(partition, entryEnd.cluster) + entryEnd.sector,
+			entryEnd.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE))
+		{ //error reading
+			return false;
+		}
+		if (entryData[DIR_ENTRY_attributes] == ATTRIB_VOL && entryData[0] != DIR_ENTRY_FREE) {		
+			for (i = 0; i < 11; i++) {
+				label[i] = entryData[DIR_ENTRY_name + i];
+			}
+			return true;
+		} else if (entryData[0] == DIR_ENTRY_LAST) {
+			end = true;
+		}
+	}
+	return false;
+}
+
+bool _FAT_directory_entryFromPosition (PARTITION* partition, DIR_ENTRY* entry) {
+	DIR_ENTRY_POSITION entryStart = entry->dataStart;
+	DIR_ENTRY_POSITION entryEnd = entry->dataEnd;
 	bool entryStillValid;
 	bool finished;
-	
 	ucs2_t lfn[MAX_LFN_LENGTH];
-
 	int i;
 	int lfnPos;
-
-	u8 entryData[DIR_ENTRY_DATA_SIZE];
+	uint8_t entryData[DIR_ENTRY_DATA_SIZE];
 	
 	memset (entry->filename, '\0', MAX_FILENAME_LENGTH);
 
@@ -627,7 +487,6 @@ bool _FAT_directory_entryFromPosition (PARTITION* partition, DIR_ENTRY* entry) {
 			&& (entryStart.offset == entryEnd.offset)) {
 			// Copy the entry data and stop, since this is the last section of the directory entry
 			memcpy (entry->entryData, entryData, DIR_ENTRY_DATA_SIZE);
-//_consolePrintf("---SFN1\n");
 			finished = true;
 		} else {
 			// Copy the long file name data
@@ -644,7 +503,7 @@ bool _FAT_directory_entryFromPosition (PARTITION* partition, DIR_ENTRY* entry) {
 	if (!entryStillValid) {
 		return false;
 	}
-
+	
 	if ((entryStart.cluster == entryEnd.cluster)
 		&& (entryStart.sector == entryEnd.sector)
 		&& (entryStart.offset == entryEnd.offset)) {
@@ -654,11 +513,11 @@ bool _FAT_directory_entryFromPosition (PARTITION* partition, DIR_ENTRY* entry) {
 		}
 	} else {
 		// Encode the long file name into a multibyte string
-		if (_FAT_directory_ucs2tombs (entry->filename, lfn, MAX_FILENAME_LENGTH) < 0) {
+		if (_FAT_directory_ucs2tombs (entry->filename, lfn, MAX_FILENAME_LENGTH) == (size_t)-1) {
 			return false;
 		}
 	}
-	//_consolePrintf("---%s\n",entry->filename);
+	
 	return true;
 }
 
@@ -668,11 +527,9 @@ bool _FAT_directory_entryFromPath (PARTITION* partition, DIR_ENTRY* entry, const
 	size_t dirnameLength;
 	const char* pathPosition;
 	const char* nextPathPosition;
-	u32 dirCluster;
+	uint32_t dirCluster;
 	bool foundFile;
-
-	//char alias[MAX_ALIAS_LENGTH];
-
+	char alias[MAX_ALIAS_LENGTH];
 	bool found, notFound;
 
 	pathPosition = path;
@@ -732,12 +589,11 @@ bool _FAT_directory_entryFromPath (PARTITION* partition, DIR_ENTRY* entry, const
 				&& (_FAT_directory_mbsncasecmp(pathPosition, entry->filename, dirnameLength) == 0)) {
 					found = true;
 			}
-//_consolePrintf("---%s %s\n",pathPosition,entry->filename);
+
 			// Check if the alias matches
-			_FAT_directory_entryGetAlias (entry->entryData, entry->alias);
-		//iprintf("---%s\n",entry->alias);
-			if ((dirnameLength == strnlen(entry->alias, MAX_ALIAS_LENGTH))
-				&& (_FAT_directory_mbsncasecmp(pathPosition, entry->alias, dirnameLength) == 0)) {
+			_FAT_directory_entryGetAlias (entry->entryData, alias);
+			if ((dirnameLength == strnlen(alias, MAX_ALIAS_LENGTH))
+				&& (strncasecmp(pathPosition, alias, dirnameLength) == 0)) {
 					found = true;
 			}
 
@@ -759,7 +615,7 @@ bool _FAT_directory_entryFromPath (PARTITION* partition, DIR_ENTRY* entry, const
 			// Check that we reached the end of the path
 			found = true;
 		} else if (entry->entryData[DIR_ENTRY_attributes] & ATTRIB_DIR) {
-			dirCluster = _FAT_directory_entryGetCluster (entry->entryData);
+			dirCluster = _FAT_directory_entryGetCluster (partition, entry->entryData);
 			pathPosition = nextPathPosition;
 			// Consume separator(s)
 			while (pathPosition[0] == DIR_SEPARATOR) {
@@ -775,6 +631,13 @@ bool _FAT_directory_entryFromPath (PARTITION* partition, DIR_ENTRY* entry, const
 	}
 
 	if (found && !notFound) {
+		if (partition->filesysType == FS_FAT32 && (entry->entryData[DIR_ENTRY_attributes] & ATTRIB_DIR) &&
+			_FAT_directory_entryGetCluster (partition, entry->entryData) == CLUSTER_ROOT) 
+		{
+			// On FAT32 it should specify an actual cluster for the root entry,
+			// not cluster 0 as on FAT16
+			_FAT_directory_getRootEntry (partition, entry);
+		}
 		return true;
 	} else {
 		return false;
@@ -782,14 +645,11 @@ bool _FAT_directory_entryFromPath (PARTITION* partition, DIR_ENTRY* entry, const
 }
 
 bool _FAT_directory_removeEntry (PARTITION* partition, DIR_ENTRY* entry) {
-	DIR_ENTRY_POSITION entryStart;
-	DIR_ENTRY_POSITION entryEnd;
-	entryStart = entry->dataStart;
-	entryEnd = entry->dataEnd;
+	DIR_ENTRY_POSITION entryStart = entry->dataStart;
+	DIR_ENTRY_POSITION entryEnd = entry->dataEnd;
 	bool entryStillValid;
 	bool finished;
-
-	u8 entryData[DIR_ENTRY_DATA_SIZE];
+	uint8_t entryData[DIR_ENTRY_DATA_SIZE];
 
 	// Create an empty directory entry to overwrite the old ones with
 	for ( entryStillValid = true, finished = false; 
@@ -811,14 +671,11 @@ bool _FAT_directory_removeEntry (PARTITION* partition, DIR_ENTRY* entry) {
 	return true;
 }
 
-static bool _FAT_directory_findEntryGap (PARTITION* partition, DIR_ENTRY* entry, u32 dirCluster, u32 size) {
+static bool _FAT_directory_findEntryGap (PARTITION* partition, DIR_ENTRY* entry, uint32_t dirCluster, size_t size) {
 	DIR_ENTRY_POSITION gapStart;
 	DIR_ENTRY_POSITION gapEnd;
-
-	u8 entryData[DIR_ENTRY_DATA_SIZE];
-
-	u32 dirEntryRemain;
-
+	uint8_t entryData[DIR_ENTRY_DATA_SIZE];
+	size_t dirEntryRemain;
 	bool endOfDirectory, entryStillValid;
 
 	// Scan Dir for free entry
@@ -886,11 +743,11 @@ static bool _FAT_directory_findEntryGap (PARTITION* partition, DIR_ENTRY* entry,
 	return true;
 }
 
-static bool _FAT_directory_entryExists (PARTITION* partition, const char* name, u32 dirCluster) {
+static bool _FAT_directory_entryExists (PARTITION* partition, const char* name, uint32_t dirCluster) {
 	DIR_ENTRY tempEntry;
 	bool foundFile;
 	char alias[MAX_ALIAS_LENGTH];
-	u32 dirnameLength;
+	size_t dirnameLength;
 
 	dirnameLength = strnlen(name, MAX_FILENAME_LENGTH);
 
@@ -910,8 +767,7 @@ static bool _FAT_directory_entryExists (PARTITION* partition, const char* name, 
 
 		// Check if the alias matches
 		_FAT_directory_entryGetAlias (tempEntry.entryData, alias);
-		if ((dirnameLength == strnlen(alias, MAX_ALIAS_LENGTH))
-			&& (_FAT_directory_mbsncasecmp(name, alias, dirnameLength) == 0)) {
+		if ((strncasecmp(name, alias, MAX_ALIAS_LENGTH) == 0)) {
 				return true;
 		}
 		foundFile = _FAT_directory_getNextEntry (partition, &tempEntry);
@@ -928,7 +784,7 @@ static int _FAT_directory_createAlias (char* alias, const char* lfn) {
 	bool lossyConversion = false;	// Set when the alias had to be modified to be valid
 	int lfnPos = 0;
 	int aliasPos = 0;
-	unsigned short  lfnChar[2];
+	wchar_t lfnChar;
 	int oemChar;
 	mbstate_t ps = {0};
 	int bytesUsed = 0;
@@ -943,13 +799,12 @@ static int _FAT_directory_createAlias (char* alias, const char* lfn) {
 	
 	// Primary portion of alias
 	while (aliasPos < 8 && lfn[lfnPos] != '.' && lfn[lfnPos] != '\0') {
-		lfnChar[0]=lfnChar[1]=0;
-		bytesUsed = mbrtowc(lfnChar, lfn + lfnPos, MAX_FILENAME_LENGTH - lfnPos, &ps);
+		bytesUsed = mbrtowc(&lfnChar, lfn + lfnPos, MAX_FILENAME_LENGTH - lfnPos, &ps);
 		if (bytesUsed < 0) {
 			return -1;
 		}
-		oemChar = wctob(towupper((wint_t)*lfnChar));
-		if (wctob((wint_t)*lfnChar) != oemChar) {
+		oemChar = wctob(towupper((wint_t)lfnChar));
+		if (wctob((wint_t)lfnChar) != oemChar) {
 			// Case of letter was changed
 			lossyConversion = true;
 		}
@@ -959,7 +814,7 @@ static int _FAT_directory_createAlias (char* alias, const char* lfn) {
 			lfnPos += bytesUsed;
 			continue;
 		}
-		if (oemChar == WEOF) {
+		if (oemChar == EOF) {
 			oemChar = '_';		// Replace unconvertable characters with underscores
 			lossyConversion = true;
 		}
@@ -974,6 +829,11 @@ static int _FAT_directory_createAlias (char* alias, const char* lfn) {
 		lfnPos += bytesUsed;
 	}
 	
+	if (lfn[lfnPos] != '.' && lfn[lfnPos] != '\0') {
+		// Name was more than 8 characters long
+		lossyConversion = true;
+	}
+	
 	// Alias extension
 	lfnExt = strrchr (lfn, '.');
 	if (lfnExt != NULL && lfnExt != strchr (lfn, '.')) {
@@ -986,13 +846,12 @@ static int _FAT_directory_createAlias (char* alias, const char* lfn) {
 		aliasPos++;
 		memset (&ps, 0, sizeof(ps));
 		for (aliasExtLen = 0; aliasExtLen < MAX_ALIAS_EXT_LENGTH && *lfnExt != '\0'; aliasExtLen++) {
-			lfnChar[0]=lfnChar[1]=0;
-			bytesUsed = mbrtowc(lfnChar, lfnExt, MAX_FILENAME_LENGTH - lfnPos, &ps);
+			bytesUsed = mbrtowc(&lfnChar, lfnExt, MAX_FILENAME_LENGTH - lfnPos, &ps);
 			if (bytesUsed < 0) {
 				return -1;
 			}
-			oemChar = wctob(towupper((wint_t)*lfnChar));
-			if (wctob((wint_t)*lfnChar) != oemChar) {
+			oemChar = wctob(towupper((wint_t)lfnChar));
+			if (wctob((wint_t)lfnChar) != oemChar) {
 				// Case of letter was changed
 				lossyConversion = true;
 			}
@@ -1002,7 +861,7 @@ static int _FAT_directory_createAlias (char* alias, const char* lfn) {
 				lfnExt += bytesUsed;
 				continue;
 			}
-			if (oemChar == WEOF) {
+			if (oemChar == EOF) {
 				oemChar = '_';		// Replace unconvertable characters with underscores
 				lossyConversion = true;
 			}
@@ -1030,14 +889,14 @@ static int _FAT_directory_createAlias (char* alias, const char* lfn) {
 	}
 }
 
-bool _FAT_directory_addEntry (PARTITION* partition, DIR_ENTRY* entry, u32 dirCluster) {
-	u32 entrySize;
-	u8 lfnEntry[DIR_ENTRY_DATA_SIZE];
-	s32 i,j; // Must be signed for use when decrementing in for loop
+bool _FAT_directory_addEntry (PARTITION* partition, DIR_ENTRY* entry, uint32_t dirCluster) {
+	size_t entrySize;
+	uint8_t lfnEntry[DIR_ENTRY_DATA_SIZE];
+	int i,j; // Must be signed for use when decrementing in for loop
 	char *tmpCharPtr;
 	DIR_ENTRY_POSITION curEntryPos;
 	bool entryStillValid;
-	u8 aliasCheckSum = 0;
+	uint8_t aliasCheckSum = 0;
 	char alias [MAX_ALIAS_LENGTH];
 	int aliasLen;
 	int lfnLen;
@@ -1058,7 +917,7 @@ bool _FAT_directory_addEntry (PARTITION* partition, DIR_ENTRY* entry, u32 dirClu
 		entry->filename[i] = '\0';
 	}
 	// Remove leading spaces
-	for (i = 0; (i < strlen (entry->filename)) && (entry->filename[i] == ' '); ++i) ;
+	for (i = 0; (i < (int)strlen (entry->filename)) && (entry->filename[i] == ' '); ++i) ;
 	if (i > 0) {
 		memmove (entry->filename, entry->filename + i, strlen (entry->filename + i));
 	}
@@ -1110,6 +969,7 @@ bool _FAT_directory_addEntry (PARTITION* partition, DIR_ENTRY* entry, u32 dirClu
 					memmove (alias + j, alias + i, strlen(alias) - i);
 					// Pad primary component
 					memset (alias + i, '_', j - i);
+					alias[MAX_ALIAS_LENGTH-1]=0;
 				}
 				
 				// Generate numeric tail
@@ -1180,7 +1040,7 @@ bool _FAT_directory_addEntry (PARTITION* partition, DIR_ENTRY* entry, u32 dirClu
 		{
 			if (i > 1) {
 				// Long filename entry
-				lfnEntry[LFN_offset_ordinal] = (i - 1) | (i == entrySize ? LFN_END : 0);
+				lfnEntry[LFN_offset_ordinal] = (i - 1) | ((size_t)i == entrySize ? LFN_END : 0);
 				for (j = 0; j < 13; j++) {
 					if (lfn [(i - 2) * 13 + j] == '\0') {
 						if ((j > 1) && (lfn [(i - 2) * 13 + (j-1)] == '\0')) {
@@ -1219,7 +1079,7 @@ bool _FAT_directory_chdir (PARTITION* partition, const char* path) {
 		return false;
 	}
 
-	partition->cwdCluster = _FAT_directory_entryGetCluster (entry.entryData);
+	partition->cwdCluster = _FAT_directory_entryGetCluster (partition, entry.entryData);
 
 	return true;
 }
@@ -1228,7 +1088,7 @@ void _FAT_directory_entryStat (PARTITION* partition, DIR_ENTRY* entry, struct st
 	// Fill in the stat struct
 	// Some of the values are faked for the sake of compatibility
 	st->st_dev = _FAT_disc_hostType(partition->disc);					// The device is the 32bit ioType value
-  	st->st_ino = (ino_t)(_FAT_directory_entryGetCluster(entry->entryData));		// The file serial number is the start cluster
+  	st->st_ino = (ino_t)(_FAT_directory_entryGetCluster(partition, entry->entryData));		// The file serial number is the start cluster
 	st->st_mode = (_FAT_directory_isDirectory(entry) ? S_IFDIR : S_IFREG) |
 		(S_IRUSR | S_IRGRP | S_IROTH) |
 		(_FAT_directory_isWritable (entry) ? (S_IWUSR | S_IWGRP | S_IWOTH) : 0);		// Mode bits based on dirEntry ATTRIB byte

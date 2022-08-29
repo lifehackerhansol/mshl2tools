@@ -9,8 +9,12 @@
 #include "_const.h"
 
 #include "dldi.h"
+#include "../../../../arm7/ipcz.h"
 
-#define POWER_CR       (*(vuint16*)0x04000304)	// add 2008.03.30 kzat3
+//#define POWER_CR       (*(vuint16*)0x04000304)	// add 2008.03.30 kzat3
+
+#include <nds/registers_alt.h>
+#define BG_256_COLOR BG_COLOR_256
 
 #if 0		// change 2008.03.30 kzat3
 void ret_menu9_R4(void);	//====== R4TF was added. by Rudolph (2007/05/23)
@@ -37,6 +41,7 @@ int main(void) {
   SetARM9_REG_WaitCR();
   
   irqInit();
+  fifoInit();
   
   {
     void InitVRAM(void);
@@ -48,8 +53,6 @@ int main(void) {
     void SoftReset(void);
     SoftReset();
   }
-  
-  while(1);
 }
 
 void InitVRAM(void)
@@ -101,6 +104,24 @@ void InitVRAM(void)
     BG2_CY = 0;
   }
 }
+
+void die(){
+	extern char *fake_heap_end;
+	for(swiWaitForVBlank();;swiWaitForVBlank())
+		if(!( ((~REG_KEYINPUT)&0x3ff) | ((IPCZ->keyxy&0x3)<<10) | ((IPCZ->keyxy&0x40/*0xc0*/)<<6) ))break;
+	if(*(u64*)fake_heap_end==0x62757473746F6F62ULL){
+		_consolePrintf("Press A to return to menu.\n");
+		for(swiWaitForVBlank();;swiWaitForVBlank())
+			if(KEY_A&( ((~REG_KEYINPUT)&0x3ff) | ((IPCZ->keyxy&0x3)<<10) | ((IPCZ->keyxy&0x40/*0xc0*/)<<6) ))
+				exit(0);
+	}else{
+		_consolePrintf("Press A to shutdown.\n");
+		for(swiWaitForVBlank();;swiWaitForVBlank())
+			if(KEY_A&( ((~REG_KEYINPUT)&0x3ff) | ((IPCZ->keyxy&0x3)<<10) | ((IPCZ->keyxy&0x40/*0xc0*/)<<6) ))
+				IPCZ->cmd=Shutdown;
+	}
+}
+
 void SoftReset(void)
 {
 #if 0	// change 2008.03.30 kzat3
@@ -121,7 +142,7 @@ void SoftReset(void)
 
 	{
 		unsigned char dldiid[5];
-		unsigned char *dldiFileData=((u32*)(&_io_dldi))-24;
+		unsigned char *dldiFileData=io_dldi_data;
 		memcpy(dldiid,(char*)dldiFileData+ioType,4);
 		dldiid[4]=0;
 		_consolePrintf("DLDI ID: %s\n",dldiid);
@@ -129,7 +150,7 @@ void SoftReset(void)
 	}
 
 	_consolePrintf("Initializing libfat... ");
-	if(!fatInitDefault()){_consolePrintf("Failed.\n");while(1);}
+	if(!fatInitDefault()){_consolePrintf("Failed.\n");die();}
 	_consolePrintf("Done.\n");
 
 	// vvvvvvvvvvv add 2008.03.30 kzat3
@@ -139,11 +160,11 @@ void SoftReset(void)
 		//_consolePrintf("Allocate done.\n");
 	} else {
 		//_consolePrintf("Allocate failed.\n");
-		//while(1);
+		//die();
 	}
 */
-	_consolePrintf("DLDI Extraction proceeded (see log for result). Please power off.\n");
-	while(1);
+	_consolePrintf("DLDI Extraction proceeded (see log for result).\n");die();
+
 	// ^^^^^^^^^^^^ add 2008.03.30 kzat3
 }
 

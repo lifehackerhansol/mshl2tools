@@ -66,8 +66,8 @@ int dldi(byte *nds,const int ndslen
 #if defined(ARM9) || defined(ARM7)
 	byte *pD=NULL;
 	int dldilen;
-	//const byte *DLDIDATA=io_dldi_data;
-	const byte *DLDIDATA=((u32*)(&_io_dldi))-24;
+	const byte *DLDIDATA=io_dldi_data;
+	//const byte *DLDIDATA=((u32*)(&_io_dldi))-24;
 #endif
 
 	byte *pA=NULL,id[5],space;
@@ -97,7 +97,7 @@ int dldi(byte *nds,const int ndslen
 
 	printf("Startup is nullified. Cannot be used for patching. Trying to fall back to MoonShell2.\n");
 	if(memcmp(pD+(*(u32*)(pD+dldiStartup)-*(u32*)(pD+dataStart)),"\x01\x00\xa0\xe3\x1e\xff\x2f\xe1",8))
-		{printf("Startup is not nullified by alternative calculation. Something is strange. Halted.\n");while(1);}
+		{printf("Startup is not nullified by alternative calculation. Something is strange. Halted.\n");die();}
 	tunedldi("/MOONSHL2/DLDIBODY.BIN",(char*)id,&dldilen,&pD,1);
 	printf("Tuned. Now we selected dldi file to patch with.\n");
 done:

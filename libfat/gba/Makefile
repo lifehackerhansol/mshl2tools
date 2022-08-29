@@ -7,7 +7,6 @@ endif
 
 include $(DEVKITARM)/gba_rules
 
-TOPDIR ?= $(CURDIR)/..
 
 #---------------------------------------------------------------------------------
 # BUILD is the directory where object files & intermediate files will be placed
@@ -18,10 +17,10 @@ TOPDIR ?= $(CURDIR)/..
 # all directories are relative to this makefile
 #---------------------------------------------------------------------------------
 BUILD		?=	release
-SOURCES		:=	../source ../source/disc_io
+SOURCES		:=	../source
 INCLUDES	:=	../include
 DATA		:=
-LIB			:=	$(TOPDIR)/gba/lib
+LIB		:=	$(TOPDIR)/gba/lib
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -38,7 +37,6 @@ CFLAGS	+=	$(INCLUDE) -DGBA
 CXXFLAGS	:=	$(CFLAGS)
 
 ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-specs=gba.specs -g $(ARCH) -mno-fpu -Wl,-Map,$(notdir $*.map)
 
 ifneq ($(BUILD),debug)
 export GBABIN	:=	$(LIB)/libfat.a
@@ -67,6 +65,7 @@ LIBDIRS	:=	$(LIBGBA)
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 #---------------------------------------------------------------------------------
 
+export TOPDIR ?= $(CURDIR)/..
 
 export DEPSDIR := $(CURDIR)/$(BUILD)
 
@@ -112,7 +111,7 @@ export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 #---------------------------------------------------------------------------------
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
-	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
  
 #---------------------------------------------------------------------------------
 clean:
@@ -122,10 +121,11 @@ clean:
 all: $(GBABIN)
 
 dist-bin:
-	@tar --exclude=*CVS* -cvjf $(TOPDIR)/distribute/$(DATESTRING)/libfat-gba-$(DATESTRING).tar.bz2 include lib
+	@tar --exclude=.svn --exclude=*CVS* -cvjf $(TOPDIR)/distribute/$(VERSTRING)/libfat-gba-$(VERSTRING).tar.bz2 include lib
 	
-install: dist-bin
-	bzip2 -cd $(TOPDIR)/distribute/$(DATESTRING)/libfat-gba-$(DATESTRING).tar.bz2 | tar -xv -C $(DEVKITPRO)/libgba
+install:
+	cp lib/libfat.a $(DEVKITPRO)/libgba/lib
+	cp include/fat.h $(DEVKITPRO)/libgba/include
  
 #---------------------------------------------------------------------------------
 else
@@ -139,6 +139,9 @@ $(GBABIN)	:	$(OFILES) $(LIB)
 	@rm -f "$(GBABIN)"
 	@$(AR) rcs "$(GBABIN)" $(OFILES)
 	@echo built ... $(notdir $@)
+
+$(LIB):
+	mkdir $(LIB)
 
 #---------------------------------------------------------------------------------
 # you need a rule like this for each extension you use as binary data 
@@ -155,5 +158,3 @@ $(GBABIN)	:	$(OFILES) $(LIB)
 endif
 #---------------------------------------------------------------------------------------
 
-$(LIB):
-	mkdir $(LIB)

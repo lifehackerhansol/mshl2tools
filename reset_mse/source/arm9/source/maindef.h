@@ -10,7 +10,7 @@
 #define ROMAUTHOR "Moonlight (Modified by Rudolph, kzat3)"
 //#define ROMENV "DevKitARMr17 + libnds-20060201"
 //#define ROMENV "DevKitARMr19b + libnds-20060719"
-#define ROMENV "DevKitARMr21 + libnds-20071023 + libfat-20070127(modified)"
+#define ROMENV "DevKitARMr31 + libnds 1.4.3 + libfat 1.0.7(modified)"
 
 #endif
 

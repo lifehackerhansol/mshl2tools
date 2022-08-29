@@ -5,18 +5,23 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/dir.h>
 
 #include "_console.h"
 #include "maindef.h"
 #include "_const.h"
-#include "../../ipcex.h"
+#include "../../../../arm7/ipcz.h"
 //#include "linkreset_arm9.h"
 
 #include "dldi.h"
+
+//#define POWER_CR       (*(vuint16*)0x04000304)	// add 2008.03.30 kzat3
+
+#include <nds/registers_alt.h>
+#define BG_256_COLOR BG_COLOR_256
+
 #include "fatx.h"
 #include "minIni.h"
-
-#define POWER_CR       (*(vuint16*)0x04000304)	// add 2008.03.30 kzat3
 
 //static bool MSEINFO_Readed=false;
 //static TMSEINFO MSEINFO;
@@ -112,16 +117,20 @@ void SplitItemFromFullPathUnicode(const UnicodeChar *pFullPathUnicode,UnicodeCha
 
 int main(void) {
   //MSEINFO_Readed=MSE_GetMSEINFO(&MSEINFO);
-  
-  REG_IME=0;
+//VRAM_C_CR = 0;
+//VRAM_CR   = 0x03000000;
   
   POWER_CR = POWER_ALL_2D;
 //  POWER_CR &= ~POWER_SWAP_LCDS;
   POWER_CR |= POWER_SWAP_LCDS;
-  
+
   SetARM9_REG_WaitCR();
-  
+
   irqInit();
+  fifoInit();
+  //REG_IPC_FIFO_CR |= IPC_FIFO_SEND_CLEAR;
+  //REG_IPC_FIFO_CR &= ~IPC_FIFO_SEND_CLEAR;
+  REG_IME=0;
   
   {
     void InitVRAM(void);
@@ -133,8 +142,6 @@ int main(void) {
     void SoftReset(void);
     SoftReset();
   }
-  
-  while(1);
 }
 
 void InitVRAM(void)
@@ -187,6 +194,25 @@ void InitVRAM(void)
   }
 }
 
+void die(){
+	extern char *fake_heap_end;
+	for(swiWaitForVBlank();;swiWaitForVBlank())
+		if(!( ((~REG_KEYINPUT)&0x3ff) | ((IPCZ->keyxy&0x3)<<10) | ((IPCZ->keyxy&0x40/*0xc0*/)<<6) ))break;
+	if(*(u64*)fake_heap_end==0x62757473746F6F62ULL){
+		_consolePrintf("Press A to return to menu.\n");
+		for(swiWaitForVBlank();;swiWaitForVBlank())
+			if(KEY_A&( ((~REG_KEYINPUT)&0x3ff) | ((IPCZ->keyxy&0x3)<<10) | ((IPCZ->keyxy&0x40/*0xc0*/)<<6) ))
+				exit(0);
+	}else{
+		_consolePrintf("Press A to shutdown.\n");
+		for(swiWaitForVBlank();;swiWaitForVBlank())
+			if(KEY_A&( ((~REG_KEYINPUT)&0x3ff) | ((IPCZ->keyxy&0x3)<<10) | ((IPCZ->keyxy&0x40/*0xc0*/)<<6) ))
+				IPCZ->cmd=Shutdown;
+	}
+}
+
+char ext[32][768];
+
 void SoftReset(void)
 {
 #if 0	// change 2008.03.30 kzat3
@@ -199,10 +225,12 @@ void SoftReset(void)
 	FILE *f;
 	TExtLinkBody extlink;
 	int size,hbmode=0;
-	ERESET RESET=RESET_NULL;
+	//ERESET RESET=RESET_NULL;
 	int flag=0;
 
-	char target[256*3]="mshl2wrap link template\0\0\0\0" //will be modified from external link maker
+	char target[256*3]=
+				//"GUIDDIUG\0\0\0\0\0\0\0\0\0\0\0\0"
+				"mshl2wrap link template\0\0\0\0" //will be modified from external link maker
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
@@ -231,7 +259,10 @@ void SoftReset(void)
 
 	char loader[256*3];
 	char utf8[768];
+	char dldiid[5];
+	unsigned char head[0x200];
 
+	IPCZ->cmd=0;
 	if(strcmp(target,template+1))flag=1;
 
 	_consolePrintf(
@@ -243,10 +274,10 @@ void SoftReset(void)
 	);
 
 	{
-		unsigned char *dldiFileData=((u32*)(&_io_dldi))-24;
-		memcpy(loader,(unsigned char*)dldiFileData+ioType,4);
-		loader[4]=0;
-		_consolePrintf("DLDI ID: %s\n",loader);
+		unsigned char *dldiFileData=io_dldi_data;
+		memcpy(dldiid,(unsigned char*)dldiFileData+ioType,4);
+		dldiid[4]=0;
+		_consolePrintf("DLDI ID: %s\n",dldiid);
 		_consolePrintf("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
 	}
 
@@ -254,7 +285,66 @@ void SoftReset(void)
 	if(!fatInitDefault())goto fail;
 	_consolePrintf("Done.\n");
 
-	ini_gets("mshl2wrap","loader",MOONSHELL,loader,256*3,"/MOONSHL2/EXTLINK/mshl2wrap.ini");
+	_consolePrintf("Checking condition of /moonshl2/extlink/... ");
+	{
+		char tmp1[768],tmp2[768];
+		u8 head[512];
+		int n=0,l=-1,i=0;
+		int l1,l2;
+		DIR_ITER *dir=diropen("/moonshl2/extlink/");
+		strcpy(tmp1,"/moonshl2/extlink/");l1=strlen(tmp1);
+		strcpy(tmp2,"/moonshl2/extlink/__link_rearrange/");l2=strlen(tmp2);
+
+		if(dir){
+			while(!dirnext(dir,ext[n],NULL)){
+				if(strlen(ext[n])>6&&!memcmp(ext[n],"nds.",4)&&!memcmp(ext[n]+strlen(ext[n])-4,".nds",4)){
+					if(n==32){dirclose(dir);_consolePrintf("too many extlink. Halt.\n");die();}
+					strcpy(tmp1+l1,ext[n]);
+					if(!(f=fopen(tmp1,"rb"))){dirclose(dir);_consolePrintf("Cannot open %s. Possibly bug... Halt.\n",tmp1);die();}
+					fread(head,1,512,f);
+					fclose(f);
+					if(!strcmp(head+0x1e0,"mshl2wrap link")){
+						if(l>=0){dirclose(dir);_consolePrintf("multiple mshl2wrap. Halt.\n");die();}
+						l=n;
+					}
+					n++;
+				}
+			}
+			dirclose(dir);
+			if(l<0&&n>0){_consolePrintf("mshl2wrap has to be in /moonshl2/extlink/ if you put nds.*.nds there. Halt.\n");die();}
+			if(l>0){
+				_consolePrintf("Need rearranging.\n");
+				mkdir("/moonshl2/extlink/__link_rearrange",0777);
+				for(i=0;i<n;i++){
+					strcpy(tmp1+l1,ext[i]);
+					strcpy(tmp2+l2,ext[i]);
+					rename(tmp1,tmp2);
+				}
+					strcpy(tmp1+l1,ext[l]);
+					strcpy(tmp2+l2,ext[l]);
+					rename(tmp2,tmp1);
+				for(i=0;i<n;i++){
+					strcpy(tmp1+l1,ext[i]);
+					strcpy(tmp2+l2,ext[i]);
+					rename(tmp2,tmp1);
+				}
+				unlink("/moonshl2/extlink/__link_rearrange"); //in libnds unlink is used for dir
+			}
+		}
+	}
+	_consolePrintf("Done.\n");
+	//die();
+
+	ini_gets("mshl2wrap",dldiid/*"loader"*/,MOONSHELL,loader,256*3,"/MOONSHL2/EXTLINK/mshl2wrap.ini");
+/*	//This might be used on 2.06...
+	if(!strcmp(loader,MOONSHELL)){
+		_consolePrintf(
+			"Loader not set for cardtype %s.\n"
+			"To force to use MoonShell HugeNDSLoader, press A\n"
+			To return to the firmware, press B\n"
+		,dldiid);
+	}
+*/
 
 if(!flag){
 	_consolePrintf("Opening moonshl2/extlink.dat... ");
@@ -280,7 +370,6 @@ if(!flag){
 
 
 if(!flag){
-	unsigned char head[0x200];
 	//_consolePrintf("Linked NDS is:\n%s\n",extlink.DataFullPathFilenameAlias);
 	_FAT_directory_ucs2tombs(utf8,extlink.DataFullPathFilenameUnicode,768);
 	if(!(f=fopen(utf8,"rb")))goto fail;
@@ -296,28 +385,30 @@ if(!flag){
 		fseek(f,s,SEEK_SET);fread(target,1,256*3,f);goto target_set;
 	}
 	_FAT_directory_ucs2tombs(target,extlink.DataFullPathFilenameUnicode,768);
-	if(hbmode=ini_getl("mshl2wrap","hbmode",0,"/MOONSHL2/EXTLINK/mshl2wrap.ini")){
+	hbmode=ini_getl("mshl2wrap","hbmode",0,"/MOONSHL2/EXTLINK/mshl2wrap.ini");
+	if(!hbmode&&!strcmp(dldiid,"M3DS"))hbmode=1;
+	if(hbmode==1&&read32(head+0x24)!=0x02000000)hbmode=2; //hn loader has some issue...
+	if(hbmode){
 		if(hbmode==1)strcpy(loader,MOONSHELL);
-		else _FAT_directory_ucs2tombs(loader,extlink.NDSFullPathFilenameUnicode,768);
+		else _FAT_directory_ucs2tombs(loader,extlink.NDSFullPathFilenameUnicode,768); //dummy
        }
 	target_set:
 	fclose(f);
 }else{ //applying target/loader manually.
-	char buf[4];
-//_consolePrintf("1\n");
-	hbmode=ini_getl("mshl2wrap","hbmode",2,"/MOONSHL2/EXTLINK/mshl2wrap.ini");
+	hbmode=ini_getl("mshl2wrap","hbmode",0,"/MOONSHL2/EXTLINK/mshl2wrap.ini");
+	if(!hbmode&&!strcmp(dldiid,"M3DS"))hbmode=1;
 	//Now confirm target.
-//_consolePrintf("2\n");
 	_consolePrintf("Linked NDS is:\n%s\n",target);
 	if(!(f=fopen(target,"rb")))goto fail;
-//_consolePrintf("3\n");
-	fseek(f,0xc,SEEK_SET);
-	fread(buf,1,4,f);
+	{struct stat st;fstat(fileno(f),&st);size=st.st_size;}
+	if(size<0x200){fclose(f);goto fail;}
+	fread(head,1,0x200,f);
 	fclose(f);
-	if(memcmp(buf,"####",4)&&memcmp(buf,"PASS",4))hbmode=0;
+	if(memcmp(head+0x0c,"####",4)&&memcmp(head+0x0c,"PASS",4)&&memcmp(head+0x0c,"ENG0",4))hbmode=0;
+	if(hbmode==1&&read32(head+0x24)!=0x02000000)hbmode=2; //hn loader has some issue...
 	if(hbmode==1)strcpy(loader,MOONSHELL);
 }
-//_consolePrintf("4\n");
+
 	memset(&extlink,0,sizeof(TExtLinkBody));
 	extlink.ID=ExtLinkBody_ID;
 	getsfnlfn(target,extlink.DataFullPathFilenameAlias,extlink.DataFullPathFilenameUnicode);
@@ -331,8 +422,8 @@ if(!flag){
 	_consolePrintf("Target NDS is:\n%s\n",extlink.DataFullPathFilenameAlias);
 	_consolePrintf("Loader name is:\n%s\n",extlink.NDSFullPathFilenameAlias);
 
-	if(strstr(extlink.DataFullPathFilenameAlias,"/MOONSHL2/EXTLINK/NDS"))
-		{_consolePrintf("You must not set loader to /moonshl2/extlink/nds*. Read warning_about_mshl2wrap_configuration.txt again. Halted.\n");while(1);}
+	//if(strstr(extlink.DataFullPathFilenameAlias,"/MOONSHL2/EXTLINK/NDS"))
+	//	{_consolePrintf("You must not set loader to /moonshl2/extlink/nds*. Read warning_about_mshl2wrap_configuration.txt again. Halted.\n");die();}
 
 if(hbmode<2){
 	if(!(f=fopen("/MOONSHL2/EXTLINK.DAT","wb")))goto fail;
@@ -348,21 +439,25 @@ if(hbmode<2){
 
 	// vvvvvvvvvvv add 2008.03.30 kzat3
 	_FAT_directory_ucs2tombs(utf8,hbmode<2?extlink.NDSFullPathFilenameUnicode:extlink.DataFullPathFilenameUnicode,768);
+
+	BootNDSROM(utf8);
+/*
 	_consolePrintf("Allocating actual loader...\n");
 	if(!ret_menu9_Gen(utf8))goto fail;
 	_consolePrintf("Done.\n");
 
 	_consolePrintf("Rebooting... ");
 #if 1
-	RESET=RESET_MENU_GEN;
-	IPCEX->RESET=RESET;
+	//RESET=RESET_MENU_GEN;
+	//IPCEX->RESET=RESET;
+	IPCZ->cmd=ResetRudolph;
+       //fifoSendValue32(FIFO_USER_07,1);
 	ret_menu9_GENs();
 #endif
-
+*/
 fail:
 	_consolePrintf("Failed.\nProcess cannot continue. Accept your fate.\n");
-	while(1);
+	die();
 	// ^^^^^^^^^^^^ add 2008.03.30 kzat3
-
 }
 

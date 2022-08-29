@@ -7,8 +7,6 @@ endif
 
 include $(DEVKITARM)/ds_rules
 
-TOPDIR ?= $(CURDIR)/..
-
 #---------------------------------------------------------------------------------
 # BUILD is the directory where object files & intermediate files will be placed
 # SOURCES is a list of directories containing source code
@@ -18,7 +16,7 @@ TOPDIR ?= $(CURDIR)/..
 # all directories are relative to this makefile
 #---------------------------------------------------------------------------------
 BUILD		?=	release
-SOURCES		:=	../source ../source/disc_io
+SOURCES		:=	../source source
 INCLUDES	:=	../include
 DATA		:=
 LIB		:=	$(TOPDIR)/nds/lib
@@ -28,12 +26,10 @@ LIB		:=	$(TOPDIR)/nds/lib
 #---------------------------------------------------------------------------------
 ARCH	:=	-mthumb -mthumb-interwork
 
-# note: arm9tdmi isn't the correct CPU arch, but anything newer and LD
-# *insists* it has a FPU or VFP, and it won't take no for an answer!
-CFLAGS	:=	-g -Wall -O2\
-		-march=armv5te -mtune=arm946e-s -fomit-frame-pointer\
-		-ffast-math \
-		$(ARCH)
+CFLAGS	:=	-Wall -O3 \
+			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
+			-ffast-math -fdata-sections \
+			$(ARCH)
 
 CFLAGS	+=	$(INCLUDE) -DARM9 -DNDS
 CXXFLAGS	:=	$(CFLAGS)
@@ -65,6 +61,8 @@ LIBDIRS	:=	$(LIBNDS)
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 #---------------------------------------------------------------------------------
 
+export TOPDIR ?= $(CURDIR)/..
+
 
 export DEPSDIR := $(CURDIR)/$(BUILD)
 
@@ -92,7 +90,7 @@ export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 #---------------------------------------------------------------------------------
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
-	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 #---------------------------------------------------------------------------------
 clean:
@@ -102,10 +100,11 @@ clean:
 all: $(ARM9BIN)
 
 dist-bin:
-	@tar --exclude=*CVS* -cvjf $(TOPDIR)/distribute/$(DATESTRING)/libfat-nds-$(DATESTRING).tar.bz2 include lib
+	@tar --exclude=.svn --exclude=*CVS* -cvjf $(TOPDIR)/distribute/$(VERSTRING)/libfat-nds-$(VERSTRING).tar.bz2 include lib
 
-install: dist-bin
-	bzip2 -cd $(TOPDIR)/distribute/$(DATESTRING)/libfat-nds-$(DATESTRING).tar.bz2 | tar -xv -C $(DEVKITPRO)/libnds
+install:
+	cp lib/libfat.a $(DEVKITPRO)/libnds/lib
+	cp include/fat.h $(DEVKITPRO)/libnds/include
 
 #---------------------------------------------------------------------------------
 else
@@ -120,6 +119,9 @@ $(ARM9BIN)	:	$(OFILES) $(LIB)
 	@$(AR) rcs "$(ARM9BIN)" $(OFILES)
 	@echo built ... $(notdir $@)
 
+$(LIB):
+	mkdir  $(LIB)
+
 
 -include $(DEPENDS)
 
@@ -127,5 +129,3 @@ $(ARM9BIN)	:	$(OFILES) $(LIB)
 endif
 #---------------------------------------------------------------------------------------
 
-$(LIB):
-	mkdir $(LIB)

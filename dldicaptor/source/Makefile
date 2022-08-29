@@ -17,7 +17,7 @@ export TOPDIR		:=	$(CURDIR)
 #---------------------------------------------------------------------------------
 export PATH		:=	$(DEVKITARM)/bin:$(PATH)
 
-.PHONY: $(TARGET).arm7 $(TARGET).arm9
+.PHONY: $(TARGET).arm9
 
 #---------------------------------------------------------------------------------
 # main targets
@@ -27,17 +27,14 @@ all: $(TARGET).nds
 #$(TARGET).ds.gba	: $(TARGET).nds
 
 #---------------------------------------------------------------------------------
-$(TARGET).nds	:	$(TARGET).arm7 $(TARGET).arm9
-	ndstool	-c $(TARGET).nds -7 $(TARGET).arm7 -9 $(TARGET).arm9 -b $(TARGET).bmp "DLDI Captor;- capture it in file -"
+$(TARGET).nds	:	$(TARGET).arm9
+	ndstool	-c $(TARGET).nds -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -b $(TARGET).bmp "DLDI Captor;- capture it in file -"
 	cp	$(TARGET).nds ../
 
 #---------------------------------------------------------------------------------
-$(TARGET).arm7	: arm7/$(TARGET).elf
 $(TARGET).arm9	: arm9/$(TARGET).elf
 
 #---------------------------------------------------------------------------------
-arm7/$(TARGET).elf:
-	$(MAKE) -C arm7
 	
 #---------------------------------------------------------------------------------
 arm9/$(TARGET).elf:
@@ -46,5 +43,4 @@ arm9/$(TARGET).elf:
 #---------------------------------------------------------------------------------
 clean:
 	$(MAKE) -C arm9 clean
-	$(MAKE) -C arm7 clean
-	rm -f $(TARGET).ds.gba $(TARGET).nds $(TARGET).arm7 $(TARGET).arm9
+	rm -f $(TARGET).ds.gba $(TARGET).nds $(TARGET).arm9

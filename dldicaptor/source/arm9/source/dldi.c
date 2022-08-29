@@ -66,8 +66,8 @@ int dldi(byte *nds,const int ndslen
 #if defined(ARM9) || defined(ARM7)
 	byte *pD=NULL;
 	int dldilen;
-	//const byte *DLDIDATA=io_dldi_data;
-	const byte *DLDIDATA=((u32*)(&_io_dldi))-24;
+	const byte *DLDIDATA=io_dldi_data;
+	//const byte *DLDIDATA=((u32*)(&_io_dldi))-24;
 #endif
 
 	byte id[5];

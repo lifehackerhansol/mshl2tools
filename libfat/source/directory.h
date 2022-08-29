@@ -25,9 +25,6 @@
  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-	2006-07-11 - Chishm
-		* Original release
 */
 
 #ifndef _DIRECTORY_H
@@ -63,17 +60,16 @@
 typedef enum {FT_DIRECTORY, FT_FILE} FILE_TYPE;
 
 typedef struct {
-	u32 cluster;
-	u32 sector;
-	s32 offset;
+	uint32_t cluster;
+	sec_t    sector;
+	int32_t  offset;
 } DIR_ENTRY_POSITION;
 
 typedef struct {
-	u8 entryData[DIR_ENTRY_DATA_SIZE];
+	uint8_t            entryData[DIR_ENTRY_DATA_SIZE];
 	DIR_ENTRY_POSITION dataStart;		// Points to the start of the LFN entries of a file, or the alias for no LFN
 	DIR_ENTRY_POSITION dataEnd;			// Always points to the file/directory's alias entry
-	char filename[MAX_FILENAME_LENGTH];
-	char alias[MAX_ALIAS_LENGTH];
+	char               filename[MAX_FILENAME_LENGTH];
 } DIR_ENTRY;
 
 // Directory entry offsets
@@ -115,7 +111,7 @@ Places result in entry
 entry will be destroyed even if no directory entry is found
 Returns true on success, false on failure
 */
-bool _FAT_directory_getFirstEntry (PARTITION* partition, DIR_ENTRY* entry, u32 dirCluster);
+bool _FAT_directory_getFirstEntry (PARTITION* partition, DIR_ENTRY* entry, uint32_t dirCluster);
 
 /*
 Reads the next directory entry after the one already pointed to by entry
@@ -155,12 +151,12 @@ The fileData, dataStart and dataEnd elements of the DIR_ENTRY struct are
 updated with the new directory entry position and alias.
 Returns true on success, false on failure
 */
-bool _FAT_directory_addEntry (PARTITION* partition, DIR_ENTRY* entry, u32 dirCluster);
+bool _FAT_directory_addEntry (PARTITION* partition, DIR_ENTRY* entry, uint32_t dirCluster);
 
 /*
 Get the start cluster of a file from it's entry data
 */
-u32 _FAT_directory_entryGetCluster (const u8* entryData); 
+uint32_t _FAT_directory_entryGetCluster (PARTITION* partition, const uint8_t* entryData); 
 
 /* 
 Fill in the file name and entry data of DIR_ENTRY* entry. 
@@ -173,5 +169,10 @@ bool _FAT_directory_entryFromPosition (PARTITION* partition, DIR_ENTRY* entry);
 Fill in a stat struct based on a file entry
 */
 void _FAT_directory_entryStat (PARTITION* partition, DIR_ENTRY* entry, struct stat *st);
+
+/*
+Get volume label
+*/
+bool _FAT_directory_getVolumeLabel (PARTITION* partition, char *label);
 
 #endif // _DIRECTORY_H

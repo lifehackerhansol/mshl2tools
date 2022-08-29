@@ -1,0 +1,1 @@
+Use this to make ndslink for MoonShell2 on NDS.

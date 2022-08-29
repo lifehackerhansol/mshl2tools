@@ -1,9 +1,9 @@
 /*
 	libfat.c
 	Simple functionality for startup, mounting and unmounting of FAT-based devices.
-	
+
  Copyright (c) 2006 Michael "Chishm" Chisholm
-	
+
  Redistribution and use in source and binary forms, with or without modification,
  are permitted provided that the following conditions are met:
 
@@ -24,36 +24,21 @@
  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-	2006-07-11 - Chishm
-		* Original release
-
-	2006-08-13 - Chishm
-		* Moved all externally visible directory related functions to fatdir
-		
-	2006-08-14 - Chishm
-		* Added extended devoptab_t functions
-		
-	2007-01-10 - Chishm
-		* fatInit now sets the correct path when setAsDefaultDevice
-		
-	2007-01-11 - Chishm
-		* Added missing #include <unistd.h>
 */
 
 #include <sys/iosupport.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "common.h"
 #include "partition.h"
 #include "fatfile.h"
 #include "fatdir.h"
+#include "lock.h"
+#include "mem_allocate.h"
+#include "disc.h"
 
-#define GBA_DEFAULT_CACHE_PAGES 2
-#define NDS_DEFAULT_CACHE_PAGES 8
-
-
-const devoptab_t dotab_fat = {
+static const devoptab_t dotab_fat = {
 	"fat",
 	sizeof (FILE_STRUCT),
 	_FAT_open_r,
@@ -72,73 +57,185 @@ const devoptab_t dotab_fat = {
 	_FAT_diropen_r,
 	_FAT_dirreset_r,
 	_FAT_dirnext_r,
-	_FAT_dirclose_r
+	_FAT_dirclose_r,
+	_FAT_statvfs_r,
+	_FAT_ftruncate_r,
+	_FAT_fsync_r,
+	NULL	/* Device data */
 };
 
-bool fatInit (u32 cacheSize, bool setAsDefaultDevice) {
-#ifdef NDS
-	bool slot1Device, slot2Device;
-	
-	// Try mounting both slots
-	slot1Device = _FAT_partition_mount (PI_SLOT_1, cacheSize);
-	slot2Device = _FAT_partition_mount (PI_SLOT_2, cacheSize);
-	
-	// Choose the default device
-	if (slot1Device) {
-		_FAT_partition_setDefaultInterface (PI_SLOT_1);
-	} else if (slot2Device) {
-		_FAT_partition_setDefaultInterface (PI_SLOT_2);
-	} else {
+bool fatMount (const char* name, const DISC_INTERFACE* interface, sec_t startSector, uint32_t cacheSize, uint32_t SectorsPerPage) {
+	PARTITION* partition;
+	devoptab_t* devops;
+	char* nameCopy;
+
+	if(!name || !interface)
+		return false;
+
+	if(!interface->startup())
+		return false;
+
+	if(!interface->isInserted())
+		return false;
+
+	devops = _FAT_mem_allocate (sizeof(devoptab_t) + strlen(name) + 1);
+	if (!devops) {
+		return false;
+	}
+	// Use the space allocated at the end of the devoptab struct for storing the name
+	nameCopy = (char*)(devops+1);
+
+	// Initialize the file system
+	partition = _FAT_partition_constructor (interface, cacheSize, SectorsPerPage, startSector);
+	if (!partition) {
+		_FAT_mem_free (devops);
 		return false;
 	}
 
-#else	// not defined NDS
-	bool cartSlotDevice;
+	// Add an entry for this device to the devoptab table
+	memcpy (devops, &dotab_fat, sizeof(dotab_fat));
+	strcpy (nameCopy, name);
+	devops->name = nameCopy;
+	devops->deviceData = partition;
 
-	cartSlotDevice = _FAT_partition_mount (PI_CART_SLOT, cacheSize);
-	
-	if (cartSlotDevice) {
-		_FAT_partition_setDefaultInterface (PI_CART_SLOT);
-	} else {
+	AddDevice (devops);
+
+	return true;
+}
+
+bool fatMountSimple (const char* name, const DISC_INTERFACE* interface) {
+	return fatMount (name, interface, 0, DEFAULT_CACHE_PAGES, DEFAULT_SECTORS_PAGE);
+}
+
+void fatUnmount (const char* name) {
+	devoptab_t *devops;
+	PARTITION* partition;
+
+	if(!name)
+		return;
+
+	devops = (devoptab_t*)GetDeviceOpTab (name);
+	if (!devops) {
+		return;
+	}
+
+	// Perform a quick check to make sure we're dealing with a libfat controlled device
+	if (devops->open_r != dotab_fat.open_r) {
+		return;
+	}
+
+	if (RemoveDevice (name) == -1) {
+		return;
+	}
+
+	partition = (PARTITION*)devops->deviceData;
+	_FAT_partition_destructor (partition);
+	_FAT_mem_free (devops);
+}
+
+bool fatInit (uint32_t cacheSize, bool setAsDefaultDevice) {
+	int i;
+	int defaultDevice = -1;
+	const DISC_INTERFACE *disc;
+
+	for (i = 0;
+		_FAT_disc_interfaces[i].name != NULL && _FAT_disc_interfaces[i].getInterface != NULL;
+		i++)
+	{
+		disc = _FAT_disc_interfaces[i].getInterface();
+		if (fatMount (_FAT_disc_interfaces[i].name, disc, 0, cacheSize, DEFAULT_SECTORS_PAGE)) {
+			// The first device to successfully mount is set as the default
+			if (defaultDevice < 0) {
+				defaultDevice = i;
+			}
+		}
+	}
+
+	if (defaultDevice < 0) {
+		// None of our devices mounted
 		return false;
-	}	
-	
-#endif	// defined NDS
+	}
 
-	AddDevice (&dotab_fat);
-	
 	if (setAsDefaultDevice) {
-		chdir ("fat:/");
+		char filePath[MAXPATHLEN * 2];
+		strcpy (filePath, _FAT_disc_interfaces[defaultDevice].name);
+		strcat (filePath, ":/");
+#ifdef ARGV_MAGIC
+		if ( __system_argv->argvMagic == ARGV_MAGIC && __system_argv->argc >= 1 && strrchr( __system_argv->argv[0], '/' )!=NULL ) {
+			// Check the app's path against each of our mounted devices, to see
+			// if we can support it. If so, change to that path.
+			for (i = 0;
+				_FAT_disc_interfaces[i].name != NULL && _FAT_disc_interfaces[i].getInterface != NULL;
+				i++)
+			{
+				if ( !strncasecmp( __system_argv->argv[0], _FAT_disc_interfaces[i].name,
+					strlen(_FAT_disc_interfaces[i].name)))
+				{
+					char *lastSlash;
+					strcpy(filePath, __system_argv->argv[0]);
+					lastSlash = strrchr( filePath, '/' );
+
+					if ( NULL != lastSlash) {
+						if ( *(lastSlash - 1) == ':') lastSlash++;
+						*lastSlash = 0;
+					}
+				}
+			}
+		}
+#endif
+		chdir (filePath);
 	}
-	
+
 	return true;
 }
 
 bool fatInitDefault (void) {
-#ifdef NDS
-	return fatInit (NDS_DEFAULT_CACHE_PAGES, true);
-#else
-	return fatInit (GBA_DEFAULT_CACHE_PAGES, true);
-#endif
+	return fatInit (DEFAULT_CACHE_PAGES, true);
 }
 
-bool fatMountNormalInterface (PARTITION_INTERFACE partitionNumber, u32 cacheSize) {
-	return _FAT_partition_mount (partitionNumber, cacheSize);
-}
+void fatGetVolumeLabel (const char* name, char *label) {
+	devoptab_t *devops;
+	PARTITION* partition;
+	char *buf;
+	int namelen,i;
 
-bool fatMountCustomInterface (const IO_INTERFACE* device, u32 cacheSize) {
-	return _FAT_partition_mountCustomInterface (device, cacheSize);
-}
+	if(!name || !label)
+		return;
 
-bool fatUnmount (PARTITION_INTERFACE partitionNumber) {
-	return _FAT_partition_unmount (partitionNumber);
-}
+	namelen = strlen(name);
+	buf=(char*)_FAT_mem_allocate(sizeof(char)*namelen+2);	
+	strcpy(buf,name);
 
+	if (name[namelen-1] == '/') {
+		buf[namelen-1]='\0';
+		namelen--;
+	}
 
-bool fatUnsafeUnmount (PARTITION_INTERFACE partitionNumber) {
-	return _FAT_partition_unsafeUnmount (partitionNumber);
-}
+	if (name[namelen-1] != ':') {
+		buf[namelen]=':';
+		buf[namelen+1]='\0';
+	}
 
-bool fatSetDefaultInterface (PARTITION_INTERFACE partitionNumber) {
-	return _FAT_partition_setDefaultInterface (partitionNumber);
+	devops = (devoptab_t*)GetDeviceOpTab(buf);
+
+	for(i=0;buf[i]!='\0' && buf[i]!=':';i++);  
+	if (!devops || strncasecmp(buf,devops->name,i)) {
+		free(buf);
+		return;
+	}
+
+	free(buf);
+
+	// Perform a quick check to make sure we're dealing with a libfat controlled device
+	if (devops->open_r != dotab_fat.open_r) {
+		return;
+	}	
+
+	partition = (PARTITION*)devops->deviceData;
+
+	if(!_FAT_directory_getVolumeLabel(partition, label)) { 
+		strncpy(label,partition->label,11);
+		label[11]='\0';
+	}
+	if(!strncmp(label, "NO NAME", 7)) label[0]='\0';
 }
