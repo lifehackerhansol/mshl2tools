@@ -38,6 +38,13 @@ void Main(){
 		_consoleEndProgress2();
 		fclose(f);
 	}
+	_consolePrint("Dumping register...\n");
+	{
+		int i=0,j;
+		f=fopen("/REGDUMP.BIN","wb");
+		fwrite((u8*)0x04000000,0x1200,1,f);
+		fclose(f);
+	}
 	_consolePrint("Dump proceeded.\n");die();
 
 	// ^^^^^^^^^^^^ add 2008.03.30 kzat3

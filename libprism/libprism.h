@@ -65,7 +65,7 @@
 ///// Config end /////
 
 ///// include and version info /////
-#define ROMVERSION "0.79f.110606"
+#define ROMVERSION "0.81f.110824"
 #define ROMDATE ""__DATE__" "__TIME__" GMT+09:00"
 
 #if defined(LIBFAT) && defined(LIBELM)
@@ -73,14 +73,14 @@
 #elif defined(LIBFAT)
 #include <fat.h>
 #ifdef _LIBNDS_MAJOR_
-#define ROMENV "DevKitARMr32 + libnds 1.5.0 +\nlibfat 1.0.9(modified)"
+#define ROMENV "DevKitARMr34 + libnds 1.5.4 +\nlibfat r4737(modified)"
 #else
 #define ROMENV "DevKitARMr23b + libnds-20071023/i +\nlibfat-20080530less(modified) [legacy]"
 #endif
 #elif defined(LIBELM)
 #include "../libelm/include/elm.h"
 #ifdef _LIBNDS_MAJOR_
-#define ROMENV "DevKitARMr32 + libnds 1.5.0 +\nlibelm R0.08b(modified)"
+#define ROMENV "DevKitARMr34 + libnds 1.5.4 +\nlibelm R0.08b(modified)"
 #else
 #define ROMENV "DevKitARMr23b + libnds-20071023/i +\nlibelm R0.08b(modified) [legacy]"
 #endif
@@ -94,7 +94,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h> //validateTM, struct tm
-#include <sys/dir.h> //getDirEntFromDirIter, DIR_ITER
+#include <sys/iosupport.h> //DIR_ITER
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <unistd.h> //low level API
@@ -136,6 +136,8 @@ extern "C" {
 #define align2(i) (((i)+1)&~1)
 #define align4(i) (((i)+3)&~3)
 #define align8(i) (((i)+7)&~7)
+#define align256(i) (((i)+255)&~255)
+#define align512(i) (((i)+511)&~511)
 
 #define min(a,b) ((a)<(b)?(a):(b))
 #define max(a,b) ((a)>(b)?(a):(b))
@@ -503,6 +505,12 @@ void *safemalloc(const int size);
 void safefree(const void *ptr);
 bool testmalloc(int size);
 u32 PrintFreeMem(void);
+
+//diropen
+DIR_ITER * mydiropen (const char *path);
+int mydirreset (DIR_ITER *dirState);
+int mydirnext (DIR_ITER *dirState, char *filename, struct stat *filestat);
+int mydirclose (DIR_ITER *dirState);
 
 #ifdef __cplusplus
 }

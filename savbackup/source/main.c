@@ -10,9 +10,9 @@ void recursive(){
 	struct stat sts,stt;
 	char *sourcefile=source+strlen(source);
 	char *targetfile=target+strlen(target);
-	dp=diropen(source);
+	dp=mydiropen(source);
 	if(!dp){_consolePrintf("Fatal: Failed to open %s\n",source);die();}
-	while(!dirnext(dp,tmp,&sts)){
+	while(!mydirnext(dp,tmp,&sts)){
 		strcpy(targetfile,tmp);
 		if(!strcmp(targetfile,".")||!strcmp(targetfile,".."))continue;
 		if(sts.st_mode&S_IFDIR){
@@ -39,7 +39,7 @@ void recursive(){
 			}
 		}
 	}
-	dirclose(dp);
+	mydirclose(dp);
 	*sourcefile=*targetfile=0;
 }
 

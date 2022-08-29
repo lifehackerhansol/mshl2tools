@@ -16,7 +16,7 @@ clean:
 
 ### final build script ###
 ../$(TARGET).nds	:	$(TARGET).arm9
-	ndstool	-c $(TARGET).nds -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -b $(TARGET).bmp "Memory Dumper"
+	ndstool	-c $(TARGET).nds -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -e9 0x02000450 -b $(TARGET).bmp "Memory Dumper"
 	mv -f	$(TARGET).nds ../
 
 ### compile main.c ###
@@ -32,7 +32,7 @@ CFLAGS	:=	-Wall -O2 \
 			-ffast-math -fdata-sections \
 			$(ARCH) -DARM9
 LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -mno-fpu -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
-LDFLAGS	+=	-Wl,--section-start,.init=0x02000000
+LDFLAGS	+=	-Wl,--section-start,.init=0x02000450
 
 $(TARGET).arm9: main.c
 	@echo Compiling...

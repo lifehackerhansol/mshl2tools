@@ -2,7 +2,7 @@
 #define ARM9
 #include <nds.h>
 
-#define ARM9_START_FLAG (*(vu8*)0x02FFFDFF)
+#define ARM9_START_FLAG (*(vu8*)0x02FFFDFB)
 /*-------------------------------------------------------------------------
 resetMemory2_ARM9
 Clears the ARM9's DMA channels and resets video memory

@@ -55,7 +55,70 @@ inline void SetARM9_REG_WaitCR(){
   
 	REG_EXMEMCNT=bw;
 }
+#if 0
+inline void fillMemory( void * addr, u32 count, u32 value ){
+	swiFastCopy( (void*)(&value), addr, (count>>2) | COPY_MODE_WORD | COPY_MODE_FILL);
+}
+inline void zeroMemory( void * addr, u32 count ){
+	fillMemory( addr, count, 0 );
+}
 
+void resetARM9Video()
+{
+	//REG_IME=0;
+	// DMA
+	u8 i=0;
+	for(; i<4; i++){
+		DMA_CR(i) = 0;
+		DMA_SRC(i) = 0;
+		DMA_DEST(i) = 0;
+		TIMER_CR(i) = 0;
+		TIMER_DATA(i) = 0;
+	}
+
+	// VIDEO
+	// trun on vram banks for clear
+	VRAM_CR = 0x80808080;
+	VRAM_E_CR = 0x80;
+	VRAM_F_CR = 0x80;
+	VRAM_G_CR = 0x80;
+	VRAM_H_CR = 0x80;
+	VRAM_I_CR = 0x80;
+	// clear vram
+	zeroMemory( VRAM, 656 * 1024 );
+	// clear video palette
+	zeroMemory( BG_PALETTE, 2048 );//PALETTE[0] = RGB15(1,1,1);
+	zeroMemory( BG_PALETTE_SUB, 2048 );
+	// clear video object attribution memory
+	zeroMemory( OAM, 2048 );
+	zeroMemory( OAM_SUB, 2048 );
+	// clear video object data memory
+	zeroMemory( SPRITE_GFX, 128 * 1024 );
+	zeroMemory( SPRITE_GFX_SUB, 128 * 1024 );
+	// clear main display registers
+	zeroMemory( (void*)0x04000008, 0x4e );
+	// clear sub display registers
+	zeroMemory( (void*)0x04001008, 0x4e );
+	
+	// clear video registers
+	//REG_DISPSTAT = DISP_IN_VBLANK;
+	SetYtrigger(80);
+
+	REG_DISPCNT = 0;
+	REG_DISPCNT_SUB = 0;
+	VRAM_A_CR = 0;
+	VRAM_B_CR = 0;
+	VRAM_C_CR = 0;
+	VRAM_D_CR = 0;
+	VRAM_E_CR = 0;
+	VRAM_F_CR = 0;
+	VRAM_G_CR = 0;
+	VRAM_H_CR = 0;
+	VRAM_I_CR = 0;
+	VRAM_CR   = 0x00000000;
+	//REG_IME=1;
+}
+#endif
 void EnableB15Main(){
 	videoSetMode(MODE_4_2D | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
 }
@@ -76,10 +139,25 @@ TransferRegionZ volatile *IPCZ;
 int main(){
 	IPCZ=(*(vu32*)0x04004000)?IPCZ_DSiMode:IPCZ_DSMode;
 	//IPCZ=IPCZ_DSMode;
+
+	//SetARM9_REG_WaitCR();
+	sysSetBusOwners( BUS_OWNER_ARM9, BUS_OWNER_ARM9 );
+	//resetARM9Video();
+
+/// I never know about side-effects.
+#ifdef _LIBNDS_MAJOR_
+	REG_MASTER_BRIGHT_SUB = REG_MASTER_BRIGHT = 0;
+#else
+	SUB_BRIGHTNESS = BRIGHTNESS = 0;
+#endif
+	//GFX_CONTROL = 0;
+	//GFX_STATUS = 0x06000000;
+	//memset((void*)0x04000640,0,0x70);
+	//REG_IF = 0x00080000;
+///
+
 	REG_POWERCNT = (u16)POWER_ALL_2D;
 	REG_POWERCNT |= POWER_SWAP_LCDS;
-
-	SetARM9_REG_WaitCR();
 
 #ifdef _LIBNDS_MAJOR_
 	//fifoInit();
@@ -126,7 +204,7 @@ int main(){
 #endif
 	(
 		VRAM_A_MAIN_BG_0x06000000,
-		VRAM_B_MAIN_BG_0x06020000,
+		0x82, //VRAM_B_LCD, //MAIN_BG_0x06020000,
 		//VRAM_B_MAIN_SPRITE_0x06400000,
 		VRAM_C_SUB_BG_0x06200000,
 		//VRAM_C_MAIN_BG_0x06020000,
@@ -141,8 +219,13 @@ int main(){
 	vramset(b15ptrMain,0,256*192);
 	vramset(b15ptrSub,0,256*192);
 
+	REG_BG0CNT = 0;
+	REG_BG0CNT_SUB = 0;
+	REG_BG1CNT = 0;
+	REG_BG1CNT_SUB = 0;
+
 	{
-		REG_BG2CNT = BG_COLOR_256 | BG_RS_64x64 | BG_MAP_BASE(8) | BG_TILE_BASE(0) | BG_PRIORITY_3; // Tile16kb Map2kb(64x32)
+		REG_BG2CNT = BG_COLOR_256 | BG_RS_64x64 | BG_MAP_BASE(8) | BG_TILE_BASE(0) | BG_PRIORITY_1; // Tile16kb Map2kb(64x32)
 
 		BG_PALETTE[(0*16)+0] = RGB15(0,0,0); // unuse (transparent)
 		BG_PALETTE[(0*16)+1] = BG_PALETTE[(0*16)+2] = bgcolor | BIT(15); // BG color
@@ -167,7 +250,7 @@ int main(){
 	}
 
 	{
-		REG_BG3CNT = BG_BMP16_256x256 | BG_BMP_BASE(2) | BG_PRIORITY_1;
+		REG_BG3CNT = BG_BMP16_256x256 | BG_BMP_BASE(2) | BG_PRIORITY_0;
 
 		REG_BG3PA = 1 << 8;
 		REG_BG3PB = 0;
@@ -178,7 +261,7 @@ int main(){
 	}
   
 	{
-		REG_BG2CNT_SUB = BG_COLOR_256 | BG_RS_64x64 | BG_MAP_BASE(8) | BG_TILE_BASE(0) | BG_PRIORITY_3; // Tile16kb Map2kb(64x32)
+		REG_BG2CNT_SUB = BG_COLOR_256 | BG_RS_64x64 | BG_MAP_BASE(8) | BG_TILE_BASE(0) | BG_PRIORITY_1; // Tile16kb Map2kb(64x32)
 
 		if(__sig_mode[6]==1){
 			BG_PALETTE_SUB[(0*16)+0] = RGB15(0,0,0); // unuse (transparent)
@@ -212,7 +295,7 @@ int main(){
 	}
 
 	{
-		REG_BG3CNT_SUB = BG_BMP16_256x256 | BG_BMP_BASE(2) | BG_PRIORITY_1;
+		REG_BG3CNT_SUB = BG_BMP16_256x256 | BG_BMP_BASE(2) | BG_PRIORITY_0;
 
 		REG_BG3PA_SUB = 1 << 8;
 		REG_BG3PB_SUB = 0;
@@ -525,8 +608,8 @@ void rm_rf(char *target){ // last byte has to be '/' *** target itself won't be 
 	if(!target)return;
 	char *targetfile=target+strlen(target);
 	struct stat st;
-	dp=diropen(target);
-	while(!dirnext(dp,targetfile,&st)){
+	dp=mydiropen(target);
+	while(!mydirnext(dp,targetfile,&st)){
 		if(!strcmp(targetfile,".")||!strcmp(targetfile,".."))continue;
 		if(st.st_mode&S_IFDIR){
 			strcat(targetfile,"/");
@@ -535,7 +618,7 @@ void rm_rf(char *target){ // last byte has to be '/' *** target itself won't be 
 			unlink(target);
 		}else unlink(target);
 	}
-	dirclose(dp);
+	mydirclose(dp);
 	*targetfile=0; //genjo fukki!
 }
 

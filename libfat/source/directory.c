@@ -252,7 +252,7 @@ static bool _FAT_directory_incrementDirEntryPosition (PARTITION* partition, DIR_
 
 	// Increment offset, wrapping at the end of a sector
 	++ position.offset;
-	if (position.offset == BYTES_PER_READ / DIR_ENTRY_DATA_SIZE) {
+	if (position.offset == partition->bytesPerSector / DIR_ENTRY_DATA_SIZE) {
 		position.offset = 0;
 		// Increment sector when wrapping
 		++ position.sector;
@@ -1165,8 +1165,8 @@ void _FAT_directory_entryStat (PARTITION* partition, DIR_ENTRY* entry, struct st
 		u8array_to_u16 (entry->entryData, DIR_ENTRY_cDate)
 	);
 	st->st_spare3 = 0;
-	st->st_blksize = BYTES_PER_READ;				// Prefered file I/O block size 
-	st->st_blocks = (st->st_size + BYTES_PER_READ - 1) / BYTES_PER_READ;	// File size in blocks
+	st->st_blksize = partition->bytesPerSector;				// Prefered file I/O block size 
+	st->st_blocks = (st->st_size + partition->bytesPerSector - 1) / partition->bytesPerSector;	// File size in blocks
 	st->st_spare4[0] = 0;
 	st->st_spare4[1] = 0;
 }

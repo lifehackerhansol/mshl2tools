@@ -3,6 +3,10 @@
 //#include <stdlib.h>
 #include "../ipcz.h"
 
+#define myPM_LED_ON    (0<<4)
+#define myPM_LED_SLEEP (1<<4)
+#define myPM_LED_BLINK (3<<4)
+
 #define __IRQ__ (IRQ_VBLANK | IRQ_VCOUNT | IRQ_NETWORK)
 
 extern void ARM7_Bios(u8 *addr,u32 size);
@@ -202,9 +206,20 @@ int main(){ //int argc, char **argv){
 	//IPCZ=/* (*(vu32*)0x04004000)?IPCZ_DSiMode: */
 	//	IPCZ_DSMode;
 	IPCZ->cmd=0xffffffff;
+
+	{int i=0;for(i=0;i<4;i++){
+		DMA_CR(i) = 0;
+		DMA_SRC(i) = 0;
+		DMA_DEST(i) = 0;
+		TIMER_CR(i) = 0;
+		TIMER_DATA(i) = 0;
+	}}
+
 	rtcReset();
 	irqInit();
 	initClockIRQ();
+
+	SetYtrigger(80);
 #ifdef _LIBNDS_MAJOR_
 	fifoInit();
 	installSystemFIFO();
@@ -221,6 +236,7 @@ int main(){ //int argc, char **argv){
 	Read_Flash(0x36, (u8*)IPCZ->MAC, 6);
 
 	writePowerManagement(0, readPowerManagement(0) | PM_BACKLIGHT_BOTTOM | PM_BACKLIGHT_TOP | PM_SOUND_AMP);
+	writePowerManagement(0, readPowerManagement(0)&~(myPM_LED_BLINK));
 #ifdef _LIBNDS_MAJOR_
 	REG_SOUNDCNT = SOUND_ENABLE | SOUND_VOL(0x7F);
 #else
@@ -280,11 +296,11 @@ int main(){ //int argc, char **argv){
 
 		if(lidclose){
 			writePowerManagement(0,readPowerManagement(0)&~(PM_BACKLIGHT_BOTTOM | PM_BACKLIGHT_TOP));
-			writePowerManagement(0, readPowerManagement(0) | PM_LED_SLEEP);
+			writePowerManagement(0, readPowerManagement(0) | myPM_LED_SLEEP);
 		}
 		if(lidopen){
 			writePowerManagement(0,readPowerManagement(0) | PM_BACKLIGHT_BOTTOM | PM_BACKLIGHT_TOP);
-			writePowerManagement(0, readPowerManagement(0)&~(PM_LED_SLEEP));
+			writePowerManagement(0, readPowerManagement(0)&~(myPM_LED_SLEEP));
 		}
 		if(IPCZ->cmd){
 			if(IPCZ->cmd==ResetRudolph){
@@ -301,7 +317,7 @@ int main(){ //int argc, char **argv){
 
 				IPCZ->cmd=0;
 				*(vu32*)0x2fffc24=dstt_sdhc;
-				//writePowerManagement(0, readPowerManagement(0) | PM_LED_BLINK);
+				//writePowerManagement(0, readPowerManagement(0) | myPM_LED_BLINK);
 				REG_IME = 0;
 				REG_IE = 0;
 				REG_IF = REG_IF;
@@ -328,7 +344,7 @@ int main(){ //int argc, char **argv){
 			}else if(IPCZ->cmd==ResetBootlib){
 				IPCZ->cmd=0;
 				*(vu32*)0x2fffc24=dstt_sdhc;
-				//writePowerManagement(0, readPowerManagement(0) | PM_LED_BLINK);
+				//writePowerManagement(0, readPowerManagement(0) | myPM_LED_BLINK);
 				while(*((vu32*)0x02fFFE24) != (u32)0x02fFFE04 && *((vu32*)0x02fFFE24) != (u32)0x0cfFFE04)swiWaitForVBlank(); 
 				irqDisable(IRQ_ALL);
 				*((vu32*)0x02fFFE34) = (u32)0x06000000; //BG_BMP_RAM(0)
@@ -338,7 +354,7 @@ int main(){ //int argc, char **argv){
 				u32 i;
 				IPCZ->cmd=0;
 				*(vu32*)0x2fffc24=dstt_sdhc;
-				//writePowerManagement(0, readPowerManagement(0) | PM_LED_BLINK);
+				//writePowerManagement(0, readPowerManagement(0) | myPM_LED_BLINK);
 				REG_IME = IME_DISABLE;	// Disable interrupts
 				REG_IF = REG_IF;	// Acknowledge interrupt
 
@@ -392,7 +408,7 @@ int main(){ //int argc, char **argv){
 
 				IPCZ->cmd=0;
 				*(vu32*)0x2fffc24=dstt_sdhc;
-				//writePowerManagement(0, readPowerManagement(0) | PM_LED_BLINK);
+				//writePowerManagement(0, readPowerManagement(0) | myPM_LED_BLINK);
 				REG_IME = 0;
 				REG_IE = 0;
 				REG_IF = REG_IF;
@@ -455,7 +471,7 @@ int main(){ //int argc, char **argv){
 
 				IPCZ->cmd=0;
 				*(vu32*)0x2fffc24=dstt_sdhc;
-				//writePowerManagement(0, readPowerManagement(0) | PM_LED_BLINK);
+				//writePowerManagement(0, readPowerManagement(0) | myPM_LED_BLINK);
 
 				REG_IME = 0;
 				REG_IE = 0;

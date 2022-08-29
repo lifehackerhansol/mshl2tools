@@ -73,26 +73,26 @@ void Main(){
 		u8 head[512];
 		int n=0,l=-1,i=0;
 		int l1,l2;
-		DIR_ITER *dir=diropen("/moonshl2/extlink/");
+		DIR_ITER *dir=mydiropen("/moonshl2/extlink/");
 		strcpy(tmp1,"/moonshl2/extlink/");l1=strlen(tmp1);
 		strcpy(tmp2,"/moonshl2/extlink/__link_rearrange/");l2=strlen(tmp2);
 
 		if(dir){
-			while(!dirnext(dir,ext[n],NULL)){
+			while(!mydirnext(dir,ext[n],NULL)){
 				if(strlen(ext[n])>6&&!memcmp(ext[n],"nds.",4)&&!memcmp(ext[n]+strlen(ext[n])-4,".nds",4)){
-					if(n==64){dirclose(dir);_consolePrint("too many extlink. Halt.\n");die();}
+					if(n==64){mydirclose(dir);_consolePrint("too many extlink. Halt.\n");die();}
 					strcpy(tmp1+l1,ext[n]);
-					if(!(f=fopen(tmp1,"rb"))){dirclose(dir);_consolePrintf("Cannot open %s. Possibly bug... Halt.\n",tmp1);die();}
+					if(!(f=fopen(tmp1,"rb"))){mydirclose(dir);_consolePrintf("Cannot open %s. Possibly bug... Halt.\n",tmp1);die();}
 					fread(head,1,512,f);
 					fclose(f);
 					if(!strcmp((char*)head+0x1e0,"mshl2wrap link")){
-						if(l>=0){dirclose(dir);_consolePrint("multiple mshl2wrap. Halt.\n");die();}
+						if(l>=0){mydirclose(dir);_consolePrint("multiple mshl2wrap. Halt.\n");die();}
 						l=n;
 					}
 					n++;
 				}
 			}
-			dirclose(dir);
+			mydirclose(dir);
 			if(l<0&&n>0){_consolePrint("mshl2wrap has to be in /moonshl2/extlink/ if you put nds.*.nds there. Halt.\n");die();}
 			if(l>0){
 				_consolePrint("Need rearranging.\n");

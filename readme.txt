@@ -772,3 +772,47 @@ Fixed some warnings.
 
 0.79f.110606
 Now XenoFile can treat extmem for msp.
+
+0.79g.110615 alpha
+DMA is cleared on start (test)
+
+0.80.110627
+Rebuilded using devkitARM r33.
+
+0.80a.110628
+Updated nesdswrap.
+
+0.80b.110703
+Updated nesdswrap.
+Updated libnds to 1.5.1.
+Fixed mshl2wrap.
+memdump now dumps register too.
+Chessmaster issue was fixed for AK2i (not for DSONEi).
+I don't know about side-effects though.
+
+0.81.110706
+Updated bootlib.
+Updated nesdswrap.
+Rebuilded using devkitARM r34.
+
+0.81a.110707
+Refixed bootlib.
+Now it is much faster thanks to multisector read.
+
+0.81b.110711
+Updated nesdswrap.
+Updated libnds to 1.5.2.
+
+0.81c.110713
+XenoFile can decrypt any R4 dats (on R4).
+XenoFile can show DS card info (aww, only on SCDS/TTDS).
+
+0.81d.110817
+Updated libnds to 1.5.3.
+
+0.81e.110823
+Updated libnds to 1.5.4.
+Updated nesdswrap.
+
+0.81f.110824
+Fixed no sound issue in 0.81e.

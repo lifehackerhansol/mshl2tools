@@ -159,11 +159,11 @@ bool BootNDSROMex2(const char *pFilename,const int bypassYSMenu,const char* dump
 	_consolePrint("Applying DLDI...\n");
 	{
 		//volatile TARMInfo *pai=&IPCZ->ARMInfo9;
-		dldi2(header[0x20/4],header[0x2c/4],bypassYSMenu,dumpname);
+		dldi2((u8*)header[0x20/4],header[0x2c/4],bypassYSMenu,dumpname);
 	}
 	disc_unmount();
 	_consolePrint("Rebooting...\n");
-	installargv(header,(char*)0x02fff400,pFilename);
+	installargv((u8*)header,(char*)0x02fff400,pFilename);
 
 	//actual reset
 	BootNDSROMex_final();

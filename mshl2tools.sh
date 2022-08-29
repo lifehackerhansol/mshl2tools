@@ -1,5 +1,5 @@
-rm -f mshl2tools_r32.7z
-7z a -r0 -mx=9 -xr0!*/.svn/* -xr0!*/.svn mshl2tools_r32.7z *.sh arm7 bootlib libfat libelm libprism readme.txt license.txt \
+rm -f mshl2tools_r34.7z
+7z a -r0 -mx=9 -xr0!*/.svn/* -xr0!*/.svn mshl2tools_r34.7z *.sh arm7 bootlib libfat libelm libprism readme.txt license.txt \
 dldi_m3r4 dldi_mati dldi_ez5v2 dldicaptor dlditest linktemplate \
 mshl2wrap ndslink iniclear inilink ak2loader akaioms2 akaioysl akysload m3loader r4loader dscoverloader \
 reset_mse reset_m3 reset_r4 resetproxy m3sakura_boot favlauncher favlauncher_bl favlauncher_ms \
@@ -80,6 +80,8 @@ cp -f fwrecovery/fwrecovery.nds internal/tool/
 cp -f inilink/nds.inilink.nds internal/moonshl2/extlink/
 cp -f iniclear/iniclear.nds internal/
 cp -f iniclear/akmenu4.nds internal/
+#cp -f memdump/memdump.nds internal/akmenu4.nds
+#dldipatch xenofile/source/dldi/rpgs.dldi internal/akmenu4.nds
 cp -f iniclear/ttmenu.dat internal/
 cp -f iniclear/ismat.dat internal/system/
 cp -f iniclear/dsgame.nds internal/_dstwo/
@@ -114,6 +116,7 @@ cp -f savbackup/savbackup.nds internal/tool/
 cp -f vhbootlib/_vh.bootlib.nds internal/moonshl2/extlink/
 cp -f woodload/woodload.nds internal/YSMenu/
 cp -f xenofile/xenofile_02000000.nds internal/
+cp -f xenofile/xenofile_02000000.nds internal/boot.nds
 cp -f ysall/ysall.nds internal/
 cp -f yswood/yswood.nds internal/
 cd internal

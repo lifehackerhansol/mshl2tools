@@ -23,9 +23,9 @@ void recursive(u8 *p, int offset, int size/*, char *source, char *target*/){
 	if(!p/*||!source||!target*/)return;
 	char *sourcefile=source+strlen(source);
 	char *targetfile=target+strlen(target);
-	dp=diropen(source);
+	dp=mydiropen(source);
 	if(!dp){_consolePrintf("Fatal: Failed to open %s\n",source);die();}
-	while(!dirnext(dp,tmp,&st)){
+	while(!mydirnext(dp,tmp,&st)){
 		strcpy(targetfile,tmp);
 		if(!strcmp(targetfile,".")||!strcmp(targetfile,".."))continue;
 		if(st.st_mode&S_IFDIR){
@@ -56,7 +56,7 @@ void recursive(u8 *p, int offset, int size/*, char *source, char *target*/){
 			fclose(f);
 		}
 	}
-	dirclose(dp);
+	mydirclose(dp);
 	*sourcefile=*targetfile=0;
 }
 

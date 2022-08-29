@@ -94,7 +94,7 @@ char ext[EXTMAX][32]={
 #define U8M_START  (BMP_START+2)
 #define MSP_START  (U8M_START+1)
 
-char *__dummy[]={
+char *__dummy[]={ //never know the reason, but without this libelm edition freezes
 	"foo","bar",
 };
 
@@ -116,6 +116,7 @@ char *context[]={
 	"Open Patch",
 	"Encrypt secure area",
 	"Decrypt secure area",
+	"Decrypt R4 kernel (only on R4)",
 	"Run as homebrew",
 	"Run as hb after swapping cart",
 	"Run as DSBooter",
@@ -129,6 +130,7 @@ char *systemmenu[]={
 	"About",
 	"Show partition info",
 	"Show system info",
+	"Show DS card info",
 	"Show M3 Region / R4 Jumper",
 	"Swap microSD",
 	"Change DLDI",
@@ -174,6 +176,7 @@ enum{
 	op_openpatch,
 	op_encryptsecure,
 	op_decryptsecure,
+	op_decryptr4,
 	op_hb,
 	op_hb_swapcart,
 	op_dsb,
@@ -187,6 +190,7 @@ enum{
 	sys_notice=0,
 	sys_partitioninfo,
 	sys_systeminfo,
+	sys_dscardinfo,
 	sys_m3region,
 	sys_swapsd,
 	sys_changedldi,
@@ -1530,7 +1534,7 @@ attr_cancel:
 					usage();
 				}break;
 				case op_encryptsecure:{
-					if(GetRunningMode()){_consolePrint2("not supported in DSi mode.\n");continue;}
+					//if(GetRunningMode()){_consolePrint2("not supported in DSi mode.\n");continue;}
 					EncryptSecureArea(file);
 					while(IPCZ->keysheld)swiWaitForVBlank();
 					_consolePrint2("Press any key.\n");
@@ -1538,12 +1542,44 @@ attr_cancel:
 					usage();
 				}break;
 				case op_decryptsecure:{
-					if(GetRunningMode()){_consolePrint2("not supported in DSi mode.\n");continue;}
+					//if(GetRunningMode()){_consolePrint2("not supported in DSi mode.\n");continue;}
 					DecryptSecureArea(file);
 					while(IPCZ->keysheld)swiWaitForVBlank();
 					_consolePrint2("Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
+				}break;
+				case op_decryptr4:{
+					//destroyfilelist();
+					//_consoleClear();
+					struct stat st;
+					if(stat(file,&st)){_consolePrintf2("Can not stat R4Menu %s.\n",file);goto decryptr4_fail;}
+					u32 addr=(u32)getFATEntryAddress(file);
+					if(!addr){_consolePrintf2("Error occurred in getting sector of %s.\n",file);goto decryptr4_fail;}
+					unsigned int size=align512(st.st_size),pos=0;
+					strcpy((char*)libprism_buf,file);
+					strcat((char*)libprism_buf,".nds");
+					FILE *f=fopen((char*)libprism_buf,"wb");
+					if(!f){_consolePrintf2("Cannot write output %s.\n",(char*)libprism_buf);goto decryptr4_fail;}
+					R4_ReadCardInfo();
+					R4_SendMap(addr&0xfffffffe);
+					//R4_00();
+					R4_ReadCardInfo();
+					_consoleStartProgress2();
+					for(pos=0;pos<size;pos+=512){
+						R4_ReadMenu(pos,libprism_buf,128);
+						fwrite(libprism_buf,1,512,f);
+						_consolePrintProgress2("Decrypting",pos+512,size);
+					}
+					_consoleEndProgress2();
+					fclose(f);
+					_consolePrint2("Decrypted.\n");
+decryptr4_fail:
+					while(IPCZ->keysheld)swiWaitForVBlank();
+					_consolePrint2("Press any key.\n");
+					while(!IPCZ->keysdown)swiWaitForVBlank();
+					usage();
+					getfilelist(dir,filter);
 				}break;
 				case op_hb:{
 					destroyfilelist();
@@ -1753,6 +1789,68 @@ attr_cancel:
 						(userdata>>6)&1
 						//PersonalData->rtcOffset
 					);
+					while(IPCZ->keysheld)swiWaitForVBlank();
+					_consolePrint2("\nPress any key.\n");
+					while(!IPCZ->keysdown)swiWaitForVBlank();
+					usage();
+				}break;
+				case sys_dscardinfo:{ //Todo. Due to KEY2 limitation, I can read only first 0x200bytes.
+char *region[]={
+	"ASI:DSVision",
+	"Unknown", //B
+	"CHN:China",
+	"NOE/GER:Germany", //D
+	"USA", //E
+	"FRA:France",
+	"Unknown" //G
+	"HOL:Netherlands",
+	"ITA:Italy",
+	"JPN:Japan",
+	"KOR:Korea",
+	"USA", //L
+	"SWE:Sweden", //M
+	"NOR:Norway",
+	"INT:International", //O
+	"EUR:Europe", //P
+	"DEN/DAN:Denmark", //Q
+	"RUS:Russia",
+	"SPA:Spain",
+	"AUS:Australia", //U
+	"EUU:EuropeUnion", //V
+	"EUU:EuropeUnion", //W
+	"EUU:EuropeUnion", //X
+	"EUU:EuropeUnion", //Y
+	"EUU:EuropeUnion", //Z
+};
+
+					char *p=(char*)libprism_buf+512;
+					_consoleClear2();
+					_consolePrint2(
+						"*** DS card info ***\n"
+						"Trying to retrive information without re-initializing card. Might be buggy.\n"
+						"If this info seems buggy, turn off NDS immediately or you might even lose your data.\n\n"
+					);
+					_consolePrintf2("Card ID:         %08x\n",cardReadID(0));
+					cardReadHeader(libprism_buf);
+					memset(p,0,13);
+					memcpy(p,libprism_buf,12);
+					_consolePrintf2("Game Name:       %s\n",p);
+					p[4]=0;
+					memcpy(p,libprism_buf+12,4);
+					_consolePrintf2("Game ID:         %s\n",p);
+					if('a'<=p[3]&&p[3]<='z')p[3]-=0x20;
+					_consolePrintf2("Card Region:     %s\n",('A'<=p[3]&&p[3]<='Z')?region[p[3]-'A']:"Unknown");
+					p[2]=0;
+					memcpy(p,libprism_buf+16,2);
+					_consolePrintf2("Maker code:      %s\n",p);
+					_consolePrintf2("Unit code:       %d\n",libprism_buf[18]);
+					_consolePrintf2("key2 seed index: %d(%02x)\n",libprism_buf[19],key_tbl[0x2a+libprism_buf[19]]);
+					_consolePrintf2("Card size:       %d bytes\n",1<<(17+libprism_buf[20]));
+					_consolePrintf2("Game version:    %02x\n",libprism_buf[30]);
+					_consolePrintf2("Flags:           %02x\n",libprism_buf[31]);
+					_consolePrintf2("Logo CRC:        %04x\n",read16(libprism_buf+0x15c));
+					_consolePrintf2("header CRC:      %04x\n",read16(libprism_buf+0x15e));
+
 					while(IPCZ->keysheld)swiWaitForVBlank();
 					_consolePrint2("\nPress any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();

@@ -182,8 +182,8 @@ bool BootDSBooter(const char *pFilename){
 	_consolePrintf("p7=0x%08x\n",(p7=pA+read32(pA+0x0c)+0x0c)-head);
 	_consolePrintf("l7=0x%08x\n",l7=read32(pA+0x14));
 	_consolePrintf("a7=0x%08x\n",a7=read32(pA+0x10));
-	pad9=0x100-(l9&0xff);
-	pad7=0x100-(l7&0xff);
+	pad9=0x100-(l9&0xff);if(pad9==0x100)pad9=0;
+	pad7=0x100-(l7&0xff);if(pad7==0x100)pad7=0;
 
 	//writing loader to memory...
 	pFileBuf=(u8*)(0x02000000+2*1024*1024);

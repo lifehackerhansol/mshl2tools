@@ -1,5 +1,4 @@
-arm9clear.arm.o: \
- /opt/mshl2tools/r32/bootlib/bootloader/source/arm9clear.arm.c \
+libelm.o: /opt/mshl2tools/r32/libelm/source/libelm.c \
  /opt/devkitPro/libnds/include/nds.h \
  /opt/devkitPro/libnds/include/nds/libversion.h \
  /opt/devkitPro/libnds/include/nds/ndstypes.h \
@@ -54,7 +53,16 @@ arm9clear.arm.o: \
  /opt/devkitPro/libnds/include/nds/system.h \
  /opt/devkitPro/libnds/include/nds/arm9/trig_lut.h \
  /opt/devkitPro/libnds/include/nds/arm9/video.h \
- /opt/devkitPro/libnds/include/nds/arm9/videoGL.h
+ /opt/devkitPro/libnds/include/nds/arm9/videoGL.h \
+ /opt/mshl2tools/r32/libelm/include/ff.h \
+ /opt/mshl2tools/r32/libelm/include/integer.h \
+ /opt/mshl2tools/r32/libelm/include/ffconf.h \
+ /opt/mshl2tools/r32/libelm/include/diskio.h \
+ /opt/mshl2tools/r32/libelm/include/elm.h \
+ /opt/mshl2tools/r32/libelm/include/ff.h \
+ /opt/mshl2tools/r32/libelm/include/elm_bool.h \
+ /opt/mshl2tools/r32/libelm/include/elm_internals.h \
+ /opt/mshl2tools/r32/libelm/include/elm_internals.h
 
 /opt/devkitPro/libnds/include/nds.h:
 
@@ -165,3 +173,21 @@ arm9clear.arm.o: \
 /opt/devkitPro/libnds/include/nds/arm9/video.h:
 
 /opt/devkitPro/libnds/include/nds/arm9/videoGL.h:
+
+/opt/mshl2tools/r32/libelm/include/ff.h:
+
+/opt/mshl2tools/r32/libelm/include/integer.h:
+
+/opt/mshl2tools/r32/libelm/include/ffconf.h:
+
+/opt/mshl2tools/r32/libelm/include/diskio.h:
+
+/opt/mshl2tools/r32/libelm/include/elm.h:
+
+/opt/mshl2tools/r32/libelm/include/ff.h:
+
+/opt/mshl2tools/r32/libelm/include/elm_bool.h:
+
+/opt/mshl2tools/r32/libelm/include/elm_internals.h:
+
+/opt/mshl2tools/r32/libelm/include/elm_internals.h:

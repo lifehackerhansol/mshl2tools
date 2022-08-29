@@ -248,7 +248,7 @@ int sdmmc_sdcard_init() {
 }
 
 //---------------------------------------------------------------------------------
-void sdmmc_sdcard_readsector(u32 sector_no, void *out) {
+void sdmmc_sd_readsector(u32 sector_no, void *out) {
 //---------------------------------------------------------------------------------
 	u16 *out16 = (u16*)out;
 	u16 resp0, resp1;
@@ -288,7 +288,7 @@ void sdmmc_sdcard_readsector(u32 sector_no, void *out) {
 }
 
 //---------------------------------------------------------------------------------
-bool sdmmc_readsectors(u32 sector_no, u32 numsectors, void *out) {
+bool sdmmc_sd_readsectors(u32 sector_no, u32 numsectors, void *out) {
 //---------------------------------------------------------------------------------
 	u16 *out16 = (u16*)out;
 	u16 resp0, resp1;

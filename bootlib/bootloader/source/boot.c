@@ -51,8 +51,8 @@ Helpful information:
 
 #include <nds/arm7/audio.h>
 
-#include <nds/fifocommon.h> //PM_LED_BLINK
-#include <nds/ipc.h>
+//#include <nds/fifocommon.h> //PM_LED_BLINK
+//#include <nds/ipc.h>
 
 #include "fat.h"
 #include "dldi_patcher.h"
@@ -66,7 +66,7 @@ void arm7clearRAM();
 #define NDS_HEAD 0x02FFFE00
 #define TEMP_ARM9_START_ADDRESS (*(vu32*)0x02FFFFF4)
 
-#define ARM9_START_FLAG (*(vu8*)0x02FFFDFF)
+#define ARM9_START_FLAG (*(vu8*)0x02FFFDFB)
 const char* bootName = "BOOT.NDS";
 
 extern unsigned long _start;
@@ -253,22 +253,26 @@ void __attribute__ ((long_call)) __attribute__((noreturn)) __attribute__((naked)
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Main function
-static bool sdmmc_inserted() {
+static bool sdmmc_inserted(){
 	return true;
 }
-__attribute__((alias("sdmmc_inserted"))) bool sdmmc_startup();
-/*
-bool sdmmc_startup() {
-	return true;
+
+static bool sdmmc_startup(){
+	sdmmc_controller_init();
+	return sdmmc_sdcard_init() == 0;
 }
-*/
-bool sdmmc_readsectors(u32 sector_no, u32 numsectors, void *out);
+
+bool sdmmc_sd_readsectors(u32 sector_no, u32 numsectors, void *out);
+
+#define myPM_LED_ON    (0<<4)
+#define myPM_LED_SLEEP (1<<4)
+#define myPM_LED_BLINK (3<<4)
 
 #define DSI_SD
 void main(){
-	if (dsiSD) {
+	if(dsiSD){
 #ifdef DSI_SD
-		_io_dldi.fn_readSectors = sdmmc_readsectors;
+		_io_dldi.fn_readSectors = sdmmc_sd_readsectors;
 		_io_dldi.fn_isInserted = sdmmc_inserted;
 		_io_dldi.fn_startup = sdmmc_startup;
 #endif
@@ -306,7 +310,7 @@ void main(){
 	copyLoop((void*)TEMP_MEM, (void*)startBinary_ARM9, startBinary_ARM9_size);
 	(*(vu32*)0x02FFFE24) = (u32)TEMP_MEM;	// Make ARM9 jump to the function
 
-	writePowerManagement(0, readPowerManagement(0) | PM_LED_BLINK);
+	writePowerManagement(0, readPowerManagement(0) | myPM_LED_BLINK);
 	// Load the NDS file
 	loadBinary_ARM7(fileCluster);
 	writePowerManagement(0, readPowerManagement(0) &0xffffffcf);

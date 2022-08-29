@@ -17,7 +17,7 @@ char *savmenu[]={
 	"Disable YSMenu softreset",
 };
 
-//read p for size(bytes).
+//readlen p for size(bytes).
 //if the chunk is larger than check(byte), RLE length(bytes) after copying retval(bytes).
 static int myRLE(const u8 *p, const unsigned int size, const unsigned int check, unsigned int *length){ //if>3bytes, fill operation will be used.
 	int i=0,j;
@@ -67,7 +67,7 @@ bool savConvert(char *file){
 	char to[768];
 	struct stat st,stto;
 	FILE *in,*out;
-	u32 size=0,read=0,cur=0;
+	u32 size=0,readlen=0,cur=0;
 
 	strcpy(to,file);
 	if(!strcasecmp(to+strlen(to)-4,".duc")){
@@ -89,9 +89,9 @@ bool savConvert(char *file){
 		size-=pad;
 		fseek(in,pad,SEEK_SET);
 		_consoleStartProgress2();
-		for(;(read=fread(libprism_buf,1,BUFLEN,in))>0;){
-			cur+=read;
-			fwrite(libprism_buf,1,read,out);
+		for(;(readlen=fread(libprism_buf,1,BUFLEN,in))>0;){
+			cur+=readlen;
+			fwrite(libprism_buf,1,readlen,out);
 			_consolePrintProgress2("Converting",cur,size);
 		}
 		_consoleEndProgress2();
@@ -117,10 +117,10 @@ bool savConvert(char *file){
 		u32 pad=size&0xfff;
 		size-=pad;
 		_consoleStartProgress2();
-		for(;(read=fread(libprism_buf,1,BUFLEN,in))>0;){
-			if(read&pad)break;
-			cur+=read;
-			fwrite(libprism_buf,1,read,out);
+		for(;(readlen=fread(libprism_buf,1,BUFLEN,in))>0;){
+			if(readlen&pad)break;
+			cur+=readlen;
+			fwrite(libprism_buf,1,readlen,out);
 			_consolePrintProgress2("Converting",cur,size);
 		}
 		_consoleEndProgress2();
@@ -140,17 +140,18 @@ bool savConvert(char *file){
 		}
 		int _in=open(file,O_RDONLY);
 		if(_in<0){_consolePrintf2("cannot open %s\n",file);return false;}
+		if(read(_in,libprism_buf,0x102)<0x102||memcmp(libprism_buf,"DSXS",4)||libprism_buf[0x100]!=0x1f||libprism_buf[0x101]!=0x8b){close(_in);_consolePrint2("not gds file\n");return false;}
 		lseek(_in,0x100,SEEK_SET);
 		gzFile gz=gzdopen(_in,"rb");
 		if(!gz){close(_in),_consolePrint2("cannot get gzip handle to decompress\n");return false;}
 		out=fopen(to,"wb");
 		if(!out){gzclose(gz);_consolePrintf2("cannot open %s\n",file);return false;}
 
-		u32 read,cur=0;
+		//u32 readlen,cur=0;
 		_consoleStartProgress2();
-		for(;(read=gzread(gz,libprism_buf,BUFLEN))>0;){
-			cur+=read;
-			fwrite(libprism_buf,1,read,out);
+		for(;(readlen=gzread(gz,libprism_buf,BUFLEN))>0;){
+			cur+=readlen;
+			fwrite(libprism_buf,1,readlen,out);
 			_consolePrintProgress2("Converting",lseek(_in,0,SEEK_CUR)-0x100,filelength(_in)-0x100);
 		}
 		_consoleEndProgress2();
@@ -192,9 +193,9 @@ bool savConvert(char *file){
 		size-=pad;
 		fseek(in,pad,SEEK_SET);
 		_consoleStartProgress2();
-		for(;(read=fread(libprism_buf,1,BUFLEN,in))>0;){
-			cur+=read;
-			fwrite(libprism_buf,1,read,out);
+		for(;(readlen=fread(libprism_buf,1,BUFLEN,in))>0;){
+			cur+=readlen;
+			fwrite(libprism_buf,1,readlen,out);
 			_consolePrintProgress2("Converting",cur,size);
 		}
 		_consoleEndProgress2();
@@ -325,9 +326,9 @@ bool savConvert(char *file){
 
 				u32 size=filelength(fileno(in)),cur=0;
 				_consoleStartProgress2();
-				for(;(read=fread(libprism_buf,1,BUFLEN,in))>0;){
-					cur+=read;
-					fwrite(libprism_buf,1,read,out);
+				for(;(readlen=fread(libprism_buf,1,BUFLEN,in))>0;){
+					cur+=readlen;
+					fwrite(libprism_buf,1,readlen,out);
 					_consolePrintProgress2("Converting",cur,size);
 				}
 				_consoleEndProgress2();
@@ -364,9 +365,9 @@ bool savConvert(char *file){
 
 				u32 size=filelength(fileno(in)),cur=0;
 				_consoleStartProgress2();
-				for(;(read=fread(libprism_buf,1,BUFLEN,in))>0;){
-					cur+=read;
-					fwrite(libprism_buf,1,read,out);
+				for(;(readlen=fread(libprism_buf,1,BUFLEN,in))>0;){
+					cur+=readlen;
+					fwrite(libprism_buf,1,readlen,out);
 					_consolePrintProgress2("Converting",cur,size);
 				}
 				_consoleEndProgress2();
@@ -391,9 +392,9 @@ bool savConvert(char *file){
 				if(!out){fclose(in);_consolePrintf2("cannot open %s\n",file);return false;}
 				u32 size=filelength(fileno(in)),cur=0;
 				_consoleStartProgress2();
-				for(;(read=fread(libprism_buf,1,BUFLEN,in))>0;){
-					cur+=read;
-					fwrite(libprism_buf,1,read,out);
+				for(;(readlen=fread(libprism_buf,1,BUFLEN,in))>0;){
+					cur+=readlen;
+					fwrite(libprism_buf,1,readlen,out);
 					_consolePrintProgress2("Converting",cur,size);
 				}
 				_consoleEndProgress2();
@@ -432,9 +433,9 @@ bool savConvert(char *file){
 				//gzsetparams(gz,9,0);
 				u32 size=filelength(fileno(in)),cur=0;
 				_consoleStartProgress2();
-				for(;(read=fread(libprism_buf,1,BUFLEN,in))>0;){
-					cur+=read;
-					gzwrite(gz,libprism_buf,read);
+				for(;(readlen=fread(libprism_buf,1,BUFLEN,in))>0;){
+					cur+=readlen;
+					gzwrite(gz,libprism_buf,readlen);
 					_consolePrintProgress2("Converting",cur,size);
 				}
 				_consoleEndProgress2();
@@ -475,9 +476,9 @@ bool savConvert(char *file){
 
 				u32 size=filelength(fileno(in)),cur=0;
 				_consoleStartProgress2();
-				for(;(read=fread(libprism_buf,1,BUFLEN,in))>0;){
-					cur+=read;
-					fwrite(libprism_buf,1,read,out);
+				for(;(readlen=fread(libprism_buf,1,BUFLEN,in))>0;){
+					cur+=readlen;
+					fwrite(libprism_buf,1,readlen,out);
 					_consolePrintProgress2("Converting",cur,size);
 				}
 				_consoleEndProgress2();
@@ -512,10 +513,10 @@ bool savConvert(char *file){
 					write32(head+0x48,insize);
 					fwrite(head,1,0x4c,out);
 					_consoleStartProgress2();
-					u32 read,cur=0;
-					for(;(read=fread(libprism_buf,1,BUFLEN,in))>0;){
-						cur+=read;
-						fwrite(libprism_buf,1,read,out);
+					//u32 readlen,cur=0;
+					for(;(readlen=fread(libprism_buf,1,BUFLEN,in))>0;){
+						cur+=readlen;
+						fwrite(libprism_buf,1,readlen,out);
 						_consolePrintProgress2("Converting",cur,insize);
 					}
 					_consoleEndProgress2();

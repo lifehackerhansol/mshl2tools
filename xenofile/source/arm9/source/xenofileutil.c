@@ -16,9 +16,9 @@ void getfilelist(char *dir,int filter){
 	fileinfo *p=&ftop;
 	struct stat st;
 	contentcount=0;
-	DIR_ITER *dp=diropen(dir);
+	DIR_ITER *dp=mydiropen(dir);
 	if(!dp){_consoleClear();_consolePrintf("cannot diropen %s\n",dir);die();}//return;
-	for(;!dirnext(dp,getfilelist_tmp,&st);){
+	for(;!mydirnext(dp,getfilelist_tmp,&st);){
 		if(!strcmp(getfilelist_tmp,"."))continue;
 		if(p->next==NULL){p->next=(fileinfo*)malloc(sizeof(fileinfo)),memset(p->next,0,sizeof(fileinfo));}
 		if(!p->next){_consoleClear();_consolePrintf("cannot alloc memory. halt. contentcount==%d\n",contentcount);die();}
@@ -48,7 +48,7 @@ ok:
 		}
 		contentcount++;
 	}
-	dirclose(dp);
+	mydirclose(dp);
 	if(contentcount<2)return;
 	if(contentcount>4096)_consolePrint2("contentcount>4096. sort skipped.\n");
 	{
@@ -149,12 +149,12 @@ bool runExtLink(char *file,char *ext){
 	strcpy(loader,"/moonshl2/extlink/");
 	char *name=loader+strlen(loader);
 
-	DIR_ITER *dp=diropen("/moonshl2/extlink/");
+	DIR_ITER *dp=mydiropen("/moonshl2/extlink/");
 	if(!dp)return false;
-	for(;!dirnext(dp,name,NULL);){
-		if(!strcasecmp(getextname(name),".nds")&&!memcmp(ext+1,name,strlen(ext+1))&&name[strlen(ext+1)]=='.'){dirclose(dp);goto exec;}
+	for(;!mydirnext(dp,name,NULL);){
+		if(!strcasecmp(getextname(name),".nds")&&!memcmp(ext+1,name,strlen(ext+1))&&name[strlen(ext+1)]=='.'){mydirclose(dp);goto exec;}
 	}
-	dirclose(dp);
+	mydirclose(dp);
 	_consolePrint("Cannot find extlink. Very weird.\n");return false;
 exec:
 	_consolePrint("Configuring extlink... ");
@@ -175,9 +175,9 @@ int iterateExtLink(int start){
 	char name[768];
 	strcpy(name,"/moonshl2/extlink/");
 	char *fname=name+strlen(name);
-	DIR_ITER *dp=diropen(name);
+	DIR_ITER *dp=mydiropen(name);
 	if(!dp)return start;
-	for(;!dirnext(dp,fname,NULL);){
+	for(;!mydirnext(dp,fname,NULL);){
 		if(!strcasecmp(getextname(fname),".nds")){
 			char* x=fname;
 			for(;*x!='.';x++);
@@ -191,7 +191,7 @@ int iterateExtLink(int start){
 			}
 		}
 	}
-	dirclose(dp);
+	mydirclose(dp);
 	return start;
 }
 
@@ -204,9 +204,9 @@ int iterateMSP(int start){
 	strcpy(name,"/moonshl/plugin/");
 	char *fname=name+strlen(name);
 	memset(reg_msp,0,sizeof(reg_msp));
-	DIR_ITER *dp=diropen("/moonshl/plugin/");
+	DIR_ITER *dp=mydiropen("/moonshl/plugin/");
 	if(!dp)return start;
-	for(;!dirnext(dp,fname,NULL);){
+	for(;!mydirnext(dp,fname,NULL);){
 		if(!strcasecmp(getextname(fname),".msp")){
 			//check file content
 			TPluginHeader PH;
@@ -231,7 +231,7 @@ int iterateMSP(int start){
 			_consolePrintf("Regist MSP: %s\n",name);
 		}
 	}
-	dirclose(dp);
+	mydirclose(dp);
 	return start;
 }
 
@@ -240,7 +240,7 @@ TPluginBody* getPluginByIndex(int idx){
 	//sprintf(name,"/moonshl/plugin/%s",reg_msp[idx]);
 	//return DLLList_LoadPlugin(name);
 	return DLLList_LoadPlugin(reg_msp[idx]);
-}	
+}
 
 //pref
 u8 dldibuf[32768];
