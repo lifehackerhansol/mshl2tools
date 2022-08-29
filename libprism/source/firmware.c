@@ -20,12 +20,15 @@ static int PRINTF(const char* format, ...){
 }
 #endif
 
+void enc_decrypt(u32 *magic, u32 *arg1, u32 *arg2);
+void enc_init1(u32 cardheader_gamecode, int level, u32 modulo);
+
 static u8		*tmp_data9;
 static u8		*tmp_data7;
 static u32		size9, size7;
 
 extern u32 card_hash[0x412];
-static u32		keyCode[3];
+//static u32		keyCode[3];
 static u32		ARM9bootAddr;
 static u32		ARM7bootAddr;
 static bool		patched;

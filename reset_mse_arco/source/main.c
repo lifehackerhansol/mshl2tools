@@ -1,6 +1,7 @@
 #include "../../libprism/libprism.h"
 #include <fcntl.h>
 const u16 bgcolor=RGB15(4,0,12);
+const int useARM7Bios=0;
 
 #define CLUSTER_EOF_16	0xFFFF
 #define CLUSTER_EOF		0x0FFFFFFF
@@ -131,6 +132,7 @@ void Main(){
 
 	DLDIToBoot=(u8*)0x02fe8000;
 	dldi2(buf,clusters*32768,0,NULL);
-	installargv(buf,(char*)0x02fff400,file);
+	if(!argvToInstall)makeargv(file);
+	installargv(buf,(char*)0x02fff400);
 	bootMoonlight((u32)buf+0xc0);
 }

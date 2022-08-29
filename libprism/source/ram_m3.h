@@ -32,6 +32,7 @@ static u16 M3_SetChipReg(u32 Data)
 	j = *(volatile u16*)(0x000407*2+0x8000000);
 	i = *(volatile u16*)(0x000000*2+0x8000000);	
 
+	if(i){}
 	return j;
 }
 
@@ -58,6 +59,8 @@ static bool SelectOpration(u16 Data)
 	
 	i = *(volatile u16*)(0xFFFFF8*2+0x8000000);
 	j = *(volatile u16*)(0xFFFFF4*2+0x8000000);
+
+	if(i||j){}
 	return true;
 }
 static u16 G6_SetChipReg(u16 Data) 
@@ -72,6 +75,7 @@ static u16 GetExtWData(u32 Address)
 	return *(volatile u16*)Address;
 }
 //==================================================
+#if 0
 static void ResetCPLD(void)
 {
 	vu16 i;
@@ -82,10 +86,11 @@ static void ResetCPLD(void)
   	i=GetExtWData(0x400321*2+0x8000000);    
   	i=GetExtWData(0x000000*2+0x8000000);
   	i=GetExtWData(0x4000f8*2+0x8000000);
-  	i=GetExtWData(0x400001*2+0x8000000);      
+  	i=GetExtWData(0x400001*2+0x8000000);
+
+    if(i){}
 }
-
-
+#endif
 static void InitCPLD(void)
 {
 	vu16 i;
@@ -103,9 +108,10 @@ static void InitCPLD(void)
   	i=GetExtWData(0xFFFFA5*2+0x8000000);
   	i=GetExtWData(0xFFFFA5*2+0x8000000);
   	i=GetExtWData(0xFFFFA5*2+0x8000000);    
-  	
-}
 
+  	if(i){}
+}
+#if 0
 static bool SelectRAM(void)
 {
   	u16 i;
@@ -118,10 +124,8 @@ static bool SelectRAM(void)
   		return TRUE;
 	else
   		return FALSE;
-  		
-  		
-  		
 }
+#endif
 //-------
 static bool DisableRAM(void)
 {
@@ -131,7 +135,8 @@ static bool DisableRAM(void)
   	InitCPLD();
  	i=GetExtWData(0x900002*2+0x8000000);  
   	i=GetExtWData(0xFFFFF8*2+0x8000000)&0x07;  
-  	j=GetExtWData(0xFFFFF4*2+0x8000000)&0x07;    	
+  	j=GetExtWData(0xFFFFF4*2+0x8000000)&0x07;   
+  	if(i||j){} 	
   	return true;
 }
 
@@ -152,7 +157,7 @@ static void sdram_setcmd(u32 command)
 	//-----------------------------------------
 	i = *(volatile u8*)(command+0xa000000);	
 	//-----------------------------------------
-
+	if(i){}
 }
 
 
@@ -162,7 +167,7 @@ static void sdram_NOP(void)
 
 	sdram_setcmd(0x1);
 	i = *(volatile u16*)(0x000000*2+0x8000000);
-		
+	if(i){}
 }
 
 static void sdram_PRECHARGE(void)
@@ -171,7 +176,7 @@ static void sdram_PRECHARGE(void)
 
 	sdram_setcmd(0x6);
 	i = *(volatile u16*)(0x000400*2+0x8000000);
-		
+	if(i){}
 }
 
 static void sdram_LOAD_MR(void)
@@ -183,7 +188,7 @@ static void sdram_LOAD_MR(void)
 	
 	sdram_setcmd(0x8);
 	i = *(volatile u16*)(0x000030*2+0x8000000);
-		
+	if(i){}
 }
 
 static void sdram_REFRESH(void)
@@ -192,7 +197,7 @@ static void sdram_REFRESH(void)
 
 	sdram_setcmd(0x7);
 	i = *(volatile u16*)(0x000000*2+0x8000000);
-		
+	if(i){}
 }
 
 static void sdram_init(void)
@@ -218,6 +223,7 @@ static void sdram_PowerDown(void)
 	
 	sdram_setcmd(0x5);
 	i = *(volatile u16*)(0x000000*2+0x8000000);
+	if(i){}
 }
 
 static void sdram_Wakeup(void)
@@ -226,6 +232,7 @@ static void sdram_Wakeup(void)
 	sdram_setcmd(0xa);
 	i = *(volatile u16*)(0x000000*2+0x8000000);
 	sdram_setcmd(0x3);
+	if(i){}
 }
 
 static vu16* M3ExtPack_Start(){
@@ -242,4 +249,3 @@ static vu16* M3ExtPack_Start(){
 static void M3ExtPack_InitReadOnly(){
 	DisableRAM();
 }
-

@@ -1,6 +1,6 @@
 #include "../../libprism/libprism.h"
-
 const u16 bgcolor=RGB15(4,0,12);
+const int useARM7Bios=0;
 
 char ininame[768];
 char menu_a[768],menu_b[768],menu_x[768],menu_y[768],menu_st[768],menu_se[768],menu_l[768],menu_r[768];

@@ -28,7 +28,6 @@
 	Secure Encryption by DarkFader
 	Keyboard Library by HeadSoft
 	MoonShell Plugin routine by Moonlight
-	libfat (C) Chishm under BSD License
 	zlib (C) Jean-loup Gailly / Mark Adler under zlib/libpng license
 	libnsbmp (C) Richard Wilson / Sean Fox under MIT license
 	md5.c (C) RSA Data Security, Inc.
@@ -65,7 +64,7 @@
 ///// Config end /////
 
 ///// include and version info /////
-#define ROMVERSION "0.81f.110824"
+#define ROMVERSION "0.88d.111211 Phase:Rebirth"
 #define ROMDATE ""__DATE__" "__TIME__" GMT+09:00"
 
 #if defined(LIBFAT) && defined(LIBELM)
@@ -188,6 +187,7 @@ enum FWType{
 /* libprism API */
 #define BUFLEN 65536
 extern u8 libprism_buf[BUFLEN];
+#define libprism_cbuf ((char*)libprism_buf)
 extern char myname[768],mypath[768],argname[768],argpath[768],libprism_name[768];
 extern bool fpassarg;
 extern u16 *b15ptrMain,*b15ptrSub; //256*192*2=96KB usable
@@ -196,6 +196,17 @@ extern char console_strbuf[2048];
 extern const unsigned char key_tbl[0x4000];
 extern const unsigned char *encr_data;
 extern vu16 *extmem;
+
+extern char **argv;
+extern int argc;
+extern char *argvToInstall;
+extern int argvToInstallSize;
+
+extern char mydrive[12];
+
+extern const int useARM7Bios; //need to on if you en/decrypt secure area or dump bios.
+extern int nocashMessageMain;
+extern int nocashMessageSub;
 
 typedef void (*type_printf)(const char*, ...);
 extern type_printf PrintfToDie;
@@ -416,7 +427,8 @@ void SplitItemFromFullPathUnicode(const UnicodeChar *pFullPathUnicode,UnicodeCha
 int filelength(int fd);
 int copy(const char *old, const char *_new);
 char *findpath(int argc, char **argv, const char *name);
-void installargv(u8 *top, void *store, const char *nds); //use top=0x02fffe00 for normal purpose
+char *makeargv(const char *str);
+void installargv(u8 *top, void *store); //use top=0x02fffe00 for normal purpose
 char *processlinker(const char *name);
 char *strcpy_safe(char *s1, const char *s2);
 char *getextname(char *s);
@@ -454,6 +466,8 @@ void* memUncached(void *address); //in CRT0.
 #define memUncachedAddr32(addr) ( (vu32*)memUncached((void*)(addr)) )
 #define memUncachedAddr16(addr) ( (vu16*)memUncached((void*)(addr)) )
 #define memUncachedAddr8(addr)  ( (vu8*)memUncached((void*)(addr)) )
+
+void nocashMessageSafe(const char *s);
 
 //encryption
 int returnDSMenu();

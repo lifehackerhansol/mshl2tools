@@ -816,3 +816,47 @@ Updated nesdswrap.
 
 0.81f.110824
 Fixed no sound issue in 0.81e.
+
+0.85.110827
+Fixed fatal bug: r23 edition couldn't receive ARGV properly.
+Removed unneeded 0x027fffe70 argv reader from r23 edition. It isn't required on modified ds_crt0_arm9.s.
+Now libprism receives ARGV in proper way.
+Added .argv handler to XenoFile.
+Added argvview / argvloader.
+mshl2tools treats all paths using driver letters.
+(Perhaps) now mshl2tools support sudokuhax.
+
+0.86.110830
+Now moonshell simply loader patches NDS header to use 0x02ff... for DSi mode.
+
+0.86a.110912 Schlaf
+Updated nesdswrap.
+
+0.87.110917 Schlaf
+Fixed nesdswrap.
+Added reset_ievo (compatible with DSi mode).
+Fixed a fatal bug in _FAT_directory_lfnLength() (thanks to desmume's lovely bug).
+
+0.87a.111005 Schlaf
+Updated nesdswrap.
+Fixed 95% warnings.
+
+0.88.111116 Schlaf
+Updated nesdswrap.
+Fixed "Change DLDI" feature (forgot to clear cache :p).
+
+0.88a.111121 Schlaf
+Added wdayloader.
+
+0.88b.111124 Schlaf
+extlink.dat path is now modifiable.
+internal archive has fishell2/extlink/nds.mshl2wrap.nds.
+ARM7 bios isn't dumped if not required.
+Outputs nocashMessage() (non-legacy only).
+
+0.88c.111125 Phase:Rebirth
+Cleaned up ram.c.
+
+0.88d.111211 Phase:Rebirth
+Fixed XenoFile's CRC16 calculation. (Now it shows the same value as LHA)
+Fixed XenoFile's very rare case bug: if selected music file can't be opened, xenofile freezes.

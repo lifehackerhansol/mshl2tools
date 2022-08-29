@@ -287,7 +287,9 @@ long ini_getl(const CHAR *Section, const CHAR *Key, long DefValue, const CHAR *F
 {
   CHAR buff[64];
   int len = ini_gets(Section, Key, __T(""), buff, sizearray(buff), Filename);
-  return (len == 0) ? DefValue : _tcstol(buff,NULL,10);
+  return (len == 0) ? DefValue
+                    : ((len >= 2 && _totupper((int)buff[1]) == 'X') ? _tcstol(buff, NULL, 16)
+                                                               : _tcstol(buff, NULL, 10));
 }
 
 /** ini_getf()

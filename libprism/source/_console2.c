@@ -192,6 +192,7 @@ void _consolePrintChar2(char c) {
 
 void _consolePrint2(const char* s)
 {
+  if(nocashMessageSub)nocashMessageSafe(s);
   if(consolePrint2_callback){consolePrint2_callback(s);return;}
   while(*s!=0){
     _consolePrintChar2(*s);

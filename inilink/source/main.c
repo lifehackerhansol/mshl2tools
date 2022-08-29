@@ -9,6 +9,7 @@
 #include "LzmaDec.h"
 
 const u16 bgcolor=RGB15(10,10,0);
+const int useARM7Bios=0;
 
 static u16 notice[3+256*192];
 
@@ -83,7 +84,7 @@ void Main(){
 {
 	char ininame[768];
 	int useak2=0,useeos=0/*,useeos2=0*/,usewoodr4=0,usem3=0;
-	int eos_alpha_accepted=0,dstwo_alpha_accepted=0,r4_alpha_accepted=0,m3sakura_alpha_accepted=0,m3sakura_iniclear_method=0,ismart_alpha_accepted=0,ez_alpha_accepted=0;
+	int eos_alpha_accepted=0,r4_alpha_accepted=0,m3sakura_alpha_accepted=0,m3sakura_iniclear_method=0,ismart_alpha_accepted=0,ez_alpha_accepted=0;
 
 	ini_gets("Config","YSMenu","/YSMENU/YSMENU.NDS",ysmenu,768,"/moonshl2/extlink/inilink.ini");
 	ini_gets("Config","YSini","/YSMENU/YSMENU.INI",ininame,768,"/moonshl2/extlink/inilink.ini");
@@ -137,7 +138,7 @@ void Main(){
 	if(!memcmp(dldiid,"EZ5i",4))ini_gets("Config","EZ5iSYS","/ez5isys.nds",ysmenu,768,"/moonshl2/extlink/inilink.ini");
 
 	eos_alpha_accepted=ini_getl("Config","eos_alpha_accepted",0,"/moonshl2/extlink/inilink.ini");
-	dstwo_alpha_accepted=ini_getl("Config","dstwo_alpha_accepted",0,"/moonshl2/extlink/inilink.ini");
+	//dstwo_alpha_accepted=ini_getl("Config","dstwo_alpha_accepted",0,"/moonshl2/extlink/inilink.ini");
 	r4_alpha_accepted=ini_getl("Config","r4_alpha_accepted",0,"/moonshl2/extlink/inilink.ini");
 	m3sakura_alpha_accepted=ini_getl("Config","m3sakura_alpha_accepted",0,"/moonshl2/extlink/inilink.ini");
 	m3sakura_iniclear_method=ini_getl("Config","m3sakura_iniclear_method",0,"/moonshl2/extlink/inilink.ini");
@@ -380,7 +381,7 @@ void Main(){
 			}
 */
 		}else if(!memcmp(dldiid,"EZ5H",4)||!memcmp(dldiid,"EZ5i",4)){
-			char target[768],tmp[776];
+			char target[768];//,tmp[776];
 			if(!ez_alpha_accepted){
 				ImageDecode(warning_ez_b15lzma,warning_ez_b15lzma_size,notice);
 				vramcpy(b15ptrSub,notice+3,256*192);

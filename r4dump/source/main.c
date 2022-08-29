@@ -1,5 +1,6 @@
 #include "../../libprism/libprism.h"
 const u16 bgcolor=RGB15(4,0,12);
+const int useARM7Bios=0;
 
 void Main(){
 	_consolePrintf(
@@ -31,7 +32,7 @@ void Main(){
 	_consolePrint("Dumping...\n");
 	{
 		FILE *f;
-		u8 buf[512];
+		//u8 buf[512];
 
 		struct stat st;
 		if(stat("/_DS_MENU.DAT",&st)){_consolePrintf("Can not stat R4Menu.\n");return;}
@@ -45,8 +46,8 @@ void Main(){
 		int pos;
 		f=fopen("/_DS_MENU.nds","wb");
 		for(pos=0;pos<st.st_size;pos+=512){
-			R4_ReadMenu(pos,buf,128);
-			fwrite(buf,1,512,f);
+			R4_ReadMenu(pos,(u32*)libprism_buf,128);
+			fwrite((u32*)libprism_buf,1,512,f);
 		}
 		fclose(f);
 	}
