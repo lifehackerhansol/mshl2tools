@@ -34,6 +34,7 @@ enum IPCZCommand{
 	GetFirmware		= 0x102,
 	WriteFirmware		= 0x103,
 	RequestBatteryLevel	= 0x111,
+	UnbrickGWInstaller	= 0x1101,
 
 	EnableDSTTSDHCFlag	= 0x201,
 	DisableDSTTSDHCFlag	= 0x202,
@@ -71,6 +72,9 @@ typedef struct{
 	CONST u16 fwchksum;
 	CONST u32 temperature; // use with /0x1000
 	CONST u32 fwsize;
+
+	//u32 argc;
+	//u32 args[8];
 
 	u8  *arm7bios_addr;
 	u32 arm7bios_bufsize;

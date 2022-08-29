@@ -292,6 +292,7 @@ long ini_getl(const CHAR *Section, const CHAR *Key, long DefValue, const CHAR *F
                                                                : _tcstol(buff, NULL, 10));
 }
 
+#if 0
 /** ini_getf()
  * \param Section     the name of the section to search for
  * \param Key         the name of the entry to find the value of
@@ -306,6 +307,7 @@ double ini_getf(const CHAR *Section, const CHAR *Key, double DefValue, const CHA
   int len = ini_gets(Section, Key, __T(""), buff, sizearray(buff), Filename);
   return (len == 0) ? DefValue : _tcstod(buff,NULL);
 }
+#endif
 
 /** ini_getbool()
  * \param Section     the name of the section to search for

@@ -39,7 +39,7 @@ void Main(){
 	strcpy(pname,".dldi");
 	dldi2(NULL,0,0,dldiname);
 }
-	_consolePrint("DLDI Extraction proceeded (see log for result).\n");die();
+	_consolePrint("DLDI Extraction processed (see log for result).\n");die();
 
 	// ^^^^^^^^^^^^ add 2008.03.30 kzat3
 }

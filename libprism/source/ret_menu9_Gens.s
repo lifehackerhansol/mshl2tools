@@ -5,10 +5,10 @@
 @  SoftwareReset Routines for General purpose.
 @************************************************************
 
- .ALIGN
- .GLOBAL	ret_menu9_GENs
- .CODE 32
- .ARM
+.align  4
+.global ret_menu9_GENs
+.type   ret_menu9_GENs STT_FUNC
+.arm
 
 ret_menu9_GENs:
 	mov	r4, #0x4000000

@@ -29,8 +29,8 @@ a9_02000000:	a9_02000000.c
 
 #---------------------------------------------------------------------------------
 ../$(TARGET).nds	:	$(TARGET).arm9 r4isdhc a9_02000000
-	r4isdhc	$(TARGET).arm9 $(TARGET).r4isdhc.arm9
-	a9_02000000	$(TARGET).arm9 $(TARGET).02000000.arm9
+	./r4isdhc	$(TARGET).arm9 $(TARGET).r4isdhc.arm9
+	./a9_02000000	$(TARGET).arm9 $(TARGET).02000000.arm9
 	ndstool	-c $(TARGET).nds -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -e9 0x02000450 -b $(TARGET).bmp "XenoFile;simple and sophisticated filer"
 	cp		$(TARGET).nds ez5sys.bin
 	dldipatch	dldi/ez5h.dldi ez5sys.bin

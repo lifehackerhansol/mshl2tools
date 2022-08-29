@@ -50,7 +50,7 @@ CFLAGS	:=	-Wall -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
 			-ffast-math -fdata-sections \
 			$(ARCH) -DARM9
-LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -mno-fpu -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
+LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
 LDFLAGS	+=	-Wl,--section-start,.init=0x02000000
 
 BINLZMA := nesterds_nds.lzma.o nesds_arm7.lzma.o nesds.lzma.o nesds_ex031.lzma.o nesds_ex040.lzma.o nesds_ex042.lzma.o nesds_ex043.lzma.o nesds_ex044.lzma.o nesDS_nds.lzma.o nesDS_r62_nds.lzma.o nesDS_r69_nds.lzma.o nesDS_r87_nds.lzma.o

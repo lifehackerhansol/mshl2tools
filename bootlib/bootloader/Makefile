@@ -7,6 +7,12 @@ endif
 
 -include $(DEVKITARM)/ds_rules
 
+ifeq ($(DSI_SD),1)
+export DSI_SD_Flag := -DDSI_SD
+else
+export DSI_SD_Flag :=
+endif
+
 #---------------------------------------------------------------------------------
 # BUILD is the directory where object files & intermediate files will be placed
 # SOURCES is a list of directories containing source code
@@ -22,7 +28,7 @@ INCLUDES	:=	build
 #---------------------------------------------------------------------------------
 ARCH	:=	-mthumb -mthumb-interwork
 
-CFLAGS	:=	-Wall -Wno-unused-but-set-variable -Os \
+CFLAGS	:=	-Wall -Wno-unused-but-set-variable -Os $(DSI_SD_Flag) \
 			-mcpu=arm7tdmi -mtune=arm7tdmi -fomit-frame-pointer \
 			-ffast-math \
 			$(ARCH)
@@ -30,7 +36,7 @@ CFLAGS	:=	-Wall -Wno-unused-but-set-variable -Os \
 CFLAGS	+=	$(INCLUDE) -DARM7
 
 ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-nostartfiles -T $(CURDIR)/../load.ld -g $(ARCH) -mno-fpu -Wl,-Map,$(TARGET).map
+LDFLAGS	=	-nostartfiles -T $(CURDIR)/../load.ld -g $(ARCH) -Wl,-Map,$(TARGET).map
 
 LIBS	:= -lnds7
 

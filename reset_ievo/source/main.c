@@ -1,6 +1,5 @@
 #include "../../libprism/libprism.h"
 #include "hc128_ecrypt-sync.h"
-#include <ctype.h>
 const u16 bgcolor=RGB15(4,0,12);
 const int useARM7Bios=0;
 

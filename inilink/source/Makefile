@@ -19,7 +19,7 @@ all: ../$(TARGET).nds
 .PHONY: clean
 
 clean:
-	rm -f $(TARGET).arm9 main.o LzmaDec.o .map
+	rm -f $(TARGET).arm9 main.o LzmaDec.o hc128.o .map
 	rm -f warning_eos.b15lzma warning_eos.b15lzma.o warning_eos_b15lzma.h
 	#rm -f warning_dstwo.b15lzma warning_dstwo.b15lzma.o warning_dstwo_b15lzma.h
 	rm -f warning_m3sakura.b15lzma warning_m3sakura.b15lzma.o warning_m3sakura_b15lzma.h
@@ -44,17 +44,18 @@ CFLAGS	:=	-Wall -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
 			-ffast-math -fdata-sections \
 			$(ARCH) -DARM9
-LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -mno-fpu -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
+LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
 LDFLAGS	+=	-Wl,--section-start,.init=0x02000000
 
 B15LZMA := warning_eos.b15lzma.o warning_m3sakura.b15lzma.o warning_r4.b15lzma.o warning_ismart.b15lzma.o warning_ez.b15lzma.o
 
-$(TARGET).arm9: main.c LzmaDec.c $(B15LZMA)
+$(TARGET).arm9: main.c LzmaDec.c hc128.c $(B15LZMA)
 	@echo Compiling...
 	@$(CC) $(CFLAGS) $(INCLUDE) -c -o main.o main.c
 	@$(CC) $(CFLAGS) $(INCLUDE) -c -o LzmaDec.o LzmaDec.c
+	@$(CC) $(CFLAGS) $(INCLUDE) -c -o hc128.o hc128.c
 	@echo Linking...
-	@$(CC) $(LDFLAGS) -o $(TARGET).arm9.elf main.o LzmaDec.o $(B15LZMA) $(LIBPATHS) $(LIBS)
+	@$(CC) $(LDFLAGS) -o $(TARGET).arm9.elf main.o LzmaDec.o hc128.o $(B15LZMA) $(LIBPATHS) $(LIBS)
 	@$(OBJCOPY) -O binary $(TARGET).arm9.elf $(TARGET).arm9
 	@rm $(TARGET).arm9.elf
 
