@@ -1,5 +1,6 @@
 #include "../../libprism/libprism.h"
 const u16 bgcolor=RGB15(4,0,12);
+const int useARM7Bios=0;
 
 void Main(){
 	char file[256*3]="";
@@ -17,7 +18,7 @@ void Main(){
 		ROMDATE,ROMENV
 	);
 
-	unsigned char dldiid[5];
+	char dldiid[5];
 	{
 		unsigned char *dldiFileData=DLDIDATA;
 		memcpy(dldiid,(char*)dldiFileData+ioType,4);

@@ -3,6 +3,7 @@
 #include "libcarddump.h"
 #include "libnsbmp.h"
 const u16 bgcolor=RGB15(0,0,6);
+const int useARM7Bios=1;
 
 #include "keyboard_b15z.h"
 #include "keyboard_shift_b15z.h"
@@ -63,7 +64,7 @@ void swapcartbeforeexec(u8* buf){
 		if(IPCZ->keysdown&KEY_A)break;
 		if(IPCZ->keysdown&KEY_B)IPCZ->cmd=Shutdown;
 	}
-	u32 romID = Card_Open(key_tbl);
+	u32 romID = Card_Open((u8*)key_tbl);
 	while(romID == 0xFFFFFFFF){
 		_consolePrintOnce("Cannot be recognized. Insert again.");
 		for(swiWaitForVBlank();;swiWaitForVBlank()){
@@ -79,13 +80,13 @@ void swapcartbeforeexec(u8* buf){
 }
 
 char ext[EXTMAX][32]={
-	".nds",
+	".nds",".argv",
 	".c",".cpp",".cc",".h",".pl",".py",".rb",".php",".txt",".ini",".log",".cfg",".conf",".htm",".html",".xml",".lst",".lua",".gm",
 	".sav",".bak",".duc",".dsv",".gds",".cfs",".ngs",
 	".dldi",".b15",".ani",".bmp",".ico",".u8m",
 };
 
-#define TEXT_START 1
+#define TEXT_START 2
 #define SAV_START  (TEXT_START+19)
 #define DLDI_START (SAV_START+7)
 #define B15_START  (DLDI_START+1)
@@ -223,6 +224,7 @@ type_constpchar BootLibrary;
 int msp_end,ext_end;
 int filter;
 void usage(){
+	nocashMessageSub=0;
 	_consoleClear2();
 #if 0
 	_consolePrint2(
@@ -259,6 +261,7 @@ void usage(){
 		filter==0?"all":filter==1?"nds":"supported",
 		hidehidden==0?"Show":"Hide"
 	);
+	nocashMessageSub=1;
 }
 
 void notice(){
@@ -266,7 +269,7 @@ void notice(){
 	_consolePrint2(
 		"XenoFile - simple and sophisticated filer\n"
 		"*** XenoShell Legacy ***\n"
-		"(C) Ciel de Rive\n"
+		"(C) Team KRypt0n\n"
 #ifdef GPL
 		"under 2-clause BSDL / GNU GPL.\n"
 #else
@@ -337,11 +340,10 @@ void Main(){
 		ROMENV"\n\n"
 	);
 	{
-		unsigned char *dldiFileData=DLDIDATA;
-		memcpy(dldiid,(char*)dldiFileData+ioType,4);
+		memcpy(dldiid,DLDIDATA+ioType,4);
 		dldiid[4]=0;
 		_consolePrintf2("DLDI ID: %s\n",dldiid);
-		_consolePrintf2("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
+		_consolePrintf2("DLDI Name: %s\n\n",(char*)DLDIDATA+friendlyName);
 	}
 
 	_consolePrint2("Initializing FAT... ");
@@ -384,6 +386,7 @@ void Main(){
 	for(;;){
 		swiWaitForVBlank();
 		showfilelist(cursor,dir);
+
 		for(;;swiWaitForVBlank()){
 			if(!IPCZ->keysheld)continue;
 			if(key=IPCZ->keysdown){keycountmax=KEYCOUNTMAX_UNREPEATED;break;}
@@ -438,7 +441,7 @@ void Main(){
 		{int i=0;for(;i<=cursor;i++)p=p->next;}
 
 		if(key&KEY_B){
-			if(dir[1]==0)continue;
+			if(!strcmp(dir,mydrive))continue; //fixme: can be buggy though...
 			dir[strlen(dir)-1]=0;
 			strrchr(dir,'/')[1]=0;
 			getfilelist(dir,filter);
@@ -467,7 +470,7 @@ void Main(){
 				case pref_rpglinkloader:BootLibrary=runRPGLink;_consolePrint2("Use rpglink.\n");break;
 				case pref_mydldi:DLDIToBoot=DLDIDATA;_consolePrint2("Use my DLDI.\n");break;
 				case pref_disabledldi:DLDIToBoot=NULL;_consolePrint2("Disabled DLDI patching.\n");break;
-				case pref_nulldldi:DLDIToBoot=DLDINull;_consolePrint2("Patch with null DLDI.\nPlease note bootlib isn't compatible.\n");break; // It will go to DSi SD in next boot.\n
+				case pref_nulldldi:DLDIToBoot=(u8*)DLDINull;_consolePrint2("Patch with null DLDI.\nPlease note bootlib isn't compatible.\n");break; // It will go to DSi SD in next boot.\n
 			}
 			continue;
 		}
@@ -505,6 +508,28 @@ void Main(){
 				if(loader[0])runCommercial(file,loader);
 				BootLibrary(file);
 				while(IPCZ->keysheld)swiWaitForVBlank();
+				_consolePrint("Failed. Press any key.\n");
+				while(!IPCZ->keysdown)swiWaitForVBlank();
+				usage();
+				getfilelist(dir,filter);
+			break;}
+
+			//handler_ARGV
+			if(strlen(p->name)>4&&!strcasecmp(p->name+strlen(p->name)-5,".argv")){
+				strcpy(file,dir);
+				strcat(file,p->name);
+				destroyfilelist();
+				_consolePrintf2("Selected %s\n",file);
+				_consoleClear();
+
+				FILE *f=fopen(file,"rb");
+				if(!f)goto argv_fail;
+				fread(libprism_cbuf,1,filelength(fileno(f)),f);
+				fclose(f);
+				char *p=makeargv(libprism_cbuf);
+				BootLibrary(p);
+				while(IPCZ->keysheld)swiWaitForVBlank();
+argv_fail:
 				_consolePrint("Failed. Press any key.\n");
 				while(!IPCZ->keysdown)swiWaitForVBlank();
 				usage();
@@ -750,8 +775,8 @@ u8m_fail:
 				_consoleClear2();
 
 				FILE *f=fopen(file,"rb");
-				if(!f){_consolePrint2("cannot open file.\n");goto msp_fail;}
 				TPluginBody* PB=NULL;
+				if(!f){_consolePrint2("cannot open file.\n");goto msp_fail;}
 				PB=getPluginByIndex(i-MSP_START);
 				if(!PB){_consolePrint2("cannot open msp.\n");goto msp_fail;}
 
@@ -864,10 +889,11 @@ msp_fail:
 				while(!IPCZ->keysdown)swiWaitForVBlank();
 
 msp_sound_end:
-				stopSound();
-				DisableB15Main();
-
-				DLLList_FreePlugin(PB);
+				if(PB){
+					stopSound();
+					DisableB15Main();
+					DLLList_FreePlugin(PB);
+				}
 				fclose(f);
 				getfilelist(dir,filter);
 				usage();
@@ -1423,7 +1449,7 @@ attr_cancel:
 					}else{
 						u32 read,cur=0;
 						u32 _crc32=crc32(0L, Z_NULL, 0),_adler32=adler32(0L, Z_NULL, 0);
-						u16 _crc16=0xffff;
+						u16 _crc16=0;
 						MD5_CTX ctx;
 						u8 digest[16];
 						MD5Init(&ctx);
@@ -1473,8 +1499,8 @@ attr_cancel:
 					usage();
 				}break;
 				case op_trim:{
-					u8 buf[0x240];
 #ifdef _LIBNDS_MAJOR_
+					u8 buf[0x240];
 					FILE *f=fopen(file,"r+b");
 					struct stat st;
 					_consoleClear2();
@@ -1567,7 +1593,7 @@ attr_cancel:
 					R4_ReadCardInfo();
 					_consoleStartProgress2();
 					for(pos=0;pos<size;pos+=512){
-						R4_ReadMenu(pos,libprism_buf,128);
+						R4_ReadMenu(pos,(u32*)libprism_buf,128);
 						fwrite(libprism_buf,1,512,f);
 						_consolePrintProgress2("Decrypting",pos+512,size);
 					}
@@ -1706,7 +1732,7 @@ decryptr4_fail:
 				}break;
 				case sys_systeminfo:{
 					u16 name_utf16[11],message_utf16[27];
-					char name[40],message[100],stime[30],fwver[20],temper[20];
+					char name[40],message[100],stime[30],fwver[30],temper[20];
 					vramcpy(name_utf16,PersonalData->name,PersonalData->nameLen);name_utf16[PersonalData->nameLen]=0;
 					vramcpy(message_utf16,PersonalData->message,PersonalData->messageLen);message_utf16[PersonalData->messageLen]=0;
 					ucs2tombs(name,name_utf16);
@@ -1920,7 +1946,7 @@ char *region[]={
 						if(IPCZ->keysdown&KEY_A)break;
 						if(IPCZ->keysdown&KEY_B)IPCZ->cmd=Shutdown;
 					}
-					u32 romID = Card_Open(key_tbl);
+					u32 romID = Card_Open((u8*)key_tbl);
 					bool fatinited=false;
 					while(romID == 0xFFFFFFFF && !(fatinited=disc_mount())){
 						_consolePrintOnce("Cannot be recognized. Insert again.");
@@ -1959,6 +1985,10 @@ char *region[]={
 					_consolePrint("microSD unmounted.\n");
 
 					dldi(DLDIDATA,32*1024);
+					memcpy(dldiid,DLDIDATA+ioType,4);
+					IC_InvalidateAll();
+					DC_FlushAll();
+					DC_InvalidateAll();
 					_consolePrint("Reinitializing FAT...\n");
 					if(!disc_mount()){_consolePrint("Failed.\n");die();}
 					_consolePrint("Done.\n");

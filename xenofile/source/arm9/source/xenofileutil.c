@@ -89,6 +89,7 @@ void showfilelist(int cursor, char *dir){
 	int i=0;
 	fileinfo *p=&ftop;
 	for(;i<top;i++)p=p->next;
+	nocashMessageMain=0;
 	_consoleClear();
 	_consolePrintf("%s\n------------------------------------------",dirshow);
 	for(;i<top+min(paging,contentcount);i++){
@@ -96,6 +97,7 @@ void showfilelist(int cursor, char *dir){
 		_consolePrint(i==cursor?"\n*":"\n ");
 		_consolePrintf(p->isDir?"[%s]":"%s",p->nameshow);
 	}
+	nocashMessageMain=1;
 }
 
 //commercial
@@ -130,7 +132,7 @@ void runCommercial(char *file,char *loader){
 }
 
 bool runTextEdit(char *file){
-	FILE *f;
+	//FILE *f;
 	//TExtLinkBody extlink;
 	char *loader="/moonshl2/extlink/_te.TextEdit.nds";
 
@@ -143,7 +145,7 @@ bool runTextEdit(char *file){
 }
 
 bool runExtLink(char *file,char *ext){
-	FILE *f;
+	//FILE *f;
 	//TExtLinkBody extlink;
 	char loader[768];
 	strcpy(loader,"/moonshl2/extlink/");
@@ -249,12 +251,14 @@ int selectpref(char *title,int argc, char *argv[]){
 	for(;;){
 		swiWaitForVBlank();
 		int i=0;
+		nocashMessageSub=0;
 		_consoleClear2();
 		_consolePrintf2("%s\n------------------------------------------",title);
 		for(;i<argc;i++){
 			_consolePrint2(i==cursor?"\n*":"\n ");
 			_consolePrint2(argv[i]);
 		}
+		nocashMessageSub=1;
 		for(;;swiWaitForVBlank()){
 			if(!IPCZ->keysheld)continue;
 			if(key=IPCZ->keysdown){keycountmax=KEYCOUNTMAX_UNREPEATED;break;}

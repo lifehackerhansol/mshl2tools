@@ -18,8 +18,8 @@ static void MWin_ProgressShow(char *TitleStr,s32 _Max){title=TitleStr,max=_Max;_
 static void MWin_ProgressSetPos(s32 _Position){_consolePrintProgress2(title,_Position,max);} //("%s %d%%\r",title,_Position*100/max);}
 static void MWin_ProgressHide(void){_consoleEndProgress2();_consolePrint2("Open Success.            \n");}
 
-static int Plugin_msp_fopen(const char *fn){return fopen(fn,"rb");}
-static bool Plugin_msp_fclose(int fh){fclose(fh);return true;}
+static int Plugin_msp_fopen(const char *fn){return (int)fopen(fn,"rb");}
+static bool Plugin_msp_fclose(int fh){fclose((FILE*)fh);return true;}
 static char *Plugin_GetINIData(){
 	TPluginBody *pPB=pCurrentPluginBody;
 	return pPB->INIData;
@@ -35,7 +35,7 @@ static void *Plugin_GetBINData(){
 	if(pPB->BINData==NULL){
 		pPB->BINData=safemalloc(pPB->BINSize);
 		if(pPB->BINData!=NULL){
-			fread(pPB->BINData,1,pPB->BINSize,pPB->BINFileHandle);
+			fread(pPB->BINData,1,pPB->BINSize,(FILE*)pPB->BINFileHandle);
 		}
 	}
 	return pPB->BINData;
@@ -119,9 +119,9 @@ bool DLL_LoadLibrary(TPluginBody *pPB,const TPlugin_StdLib *pStdLib,void *pbin,i
     char *str=pPH->info;
     _consolePrintf2("Name=%s\n",str);
     while(*str!=0){
-      *str++;
+      str++;
     }
-    *str++;
+    str++;
     _consolePrintf2("Author=%s\n",str);
   }
   _consolePrint2("\n");
@@ -426,7 +426,7 @@ void DLLList_FreePlugin(TPluginBody *pPB)
   }
   
   if(pPB->BINFileHandle!=0){
-    fclose(pPB->BINFileHandle);
+    fclose((FILE*)pPB->BINFileHandle);
     pPB->BINFileHandle=0;
   }
   

@@ -56,6 +56,12 @@ void runNdsViaStub(const char* filename, u32 cluster/*, bool initDisc, bool dldi
 if(*(vu16*)P>=5){ //bootlib v2 with ARGV
 	//set argv
 	u32 arg=align4( (u32)P+read32((data_t*)P+0x10) );
+	if(!argvToInstall)makeargv(filename);
+	installargv(NULL,(char*)arg);
+	writeAddr((data_t*)P+0x10, arg-(u32)P);
+	writeAddr((data_t*)P+0x14, argvToInstallSize);
+	writeAddr(bootstub+0x10,align4((char*)arg+argvToInstallSize-(char*)P));//align4(st.st_size)+align4(strlen(filename)+5));
+#if 0
 	strcpy((char*)arg,"fat:");
 	strcpy(((char*)arg)+4,filename);
 	write32((data_t*)P+0x10, arg-(u32)P);
@@ -68,10 +74,11 @@ if(*(vu16*)P>=5){ //bootlib v2 with ARGV
 		write32((data_t*)P+0x14, strlen(filename)+5+strlen(argname)+5);
 		write32(bootstub+0x10,align4((char*)arg+strlen(filename)+5+strlen(argname)+5-(char*)P));//align4(st.st_size)+align4(strlen(filename)+5));
 	}
+#endif
 }
 
 if(*(vu16*)P>=6){ //bootlib v3 with DSi SD
-	writeAddr((data_t*)P+0x1c, 0); // sorry but sd:/ not supported currently.
+	writeAddr((data_t*)P+0x1c, !strcmp(mydrive,"fat:/")?0:1);
 }
 
 	//make sure loader is written to memory

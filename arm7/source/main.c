@@ -3,13 +3,28 @@
 //#include <stdlib.h>
 #include "../ipcz.h"
 
+void nocashMessageSafe(const char *s){
+#ifdef _LIBNDS_MINOR_
+	const int LENGTH=112;
+	int i=0,c;
+	for(;i+LENGTH<strlen(s);i+=LENGTH){
+		c=s[i+LENGTH];
+		((char*)s)[i+LENGTH]=0;
+		nocashMessage(s+i);
+		((char*)s)[i+LENGTH]=c;
+	}
+	nocashMessage(s+i);
+#endif
+}
+
 #define myPM_LED_ON    (0<<4)
 #define myPM_LED_SLEEP (1<<4)
 #define myPM_LED_BLINK (3<<4)
 
 #define __IRQ__ (IRQ_VBLANK | IRQ_VCOUNT | IRQ_NETWORK)
 
-extern void ARM7_Bios(u8 *addr,u32 size);
+void SwitchUserMode();
+void ARM7_Bios(u8 *addr,u32 size);
 u8 *bootstub;
 typedef void (*type_void)();
 type_void bootstub_arm7;

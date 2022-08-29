@@ -1,5 +1,6 @@
 #include "../../libprism/libprism.h"
 const u16 bgcolor=RGB15(4,0,12);
+const int useARM7Bios=0;
 
 void Main(){
 	char loader[768],lang[10],config[768],target[768];

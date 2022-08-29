@@ -1,5 +1,6 @@
 #include "../../libprism/libprism.h"
 const u16 bgcolor=RGB15(0,8,8);
+const int useARM7Bios=0;
 
 char *template="*mshl2wrap link template";
 char ext[64][768];

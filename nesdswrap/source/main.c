@@ -10,12 +10,14 @@
 #include "nesterds_nds_lzma.h"
 #include "nesDS_r62_nds_lzma.h"
 #include "nesDS_r69_nds_lzma.h"
+#include "nesDS_r87_nds_lzma.h"
 #include "nesDS_nds_lzma.h"
 
 #include "LzmaDec.h"
 
 const u16 bgcolor=RGB15(31,31,31);
 //const u16 bgcolor=RGB15(0,0,0);
+const int useARM7Bios=0;
 extern unsigned char ndshead[512];
 u32 keys;
 
@@ -23,7 +25,7 @@ u32 keys;
 	nesDS all in one
 
 	hold Start:  nesDS EX 031
-	hold Select: nesterDS moonlight
+	hold Select: nesterDS moonlight (only extlink)
 	hold A:      nesDS ORG
 	hold B:      nesDS (EX) 040
 	hold X:      nesDS (EX) 042
@@ -31,10 +33,10 @@ u32 keys;
 	hold L:      nesDS (EX) 044
 	hold R:      nesDS r62 (0.48b)
 	hold Up:     nesDS r69 (0.51a)
-	hold Down:   
+	hold Down:   nesDS r87+ (0.56a1)
 	hold Left:   
 	hold Right:  
-	none:        nesDS r83 (0.55a)
+	none:        nesDS r92 (1.0a)
 
 	nesDS EX series 0.22/0.30 aren't implemented. Use 0.31 (final version).
 	Please note that nesDS ORG/EX/0.44's arm7 are shared.
@@ -57,9 +59,9 @@ void loadNesDSLegacy(){
 	int i;
 
 	u32 l9,cl9;
-	u8* p9;
+	const u8* p9;
 	u32 l7,cl7;
-	u8* p7;
+	const u8* p7;
 
 	if(keys&KEY_A){
 		l9=(u32)read64(nesds_lzma+5);
@@ -85,7 +87,7 @@ void loadNesDSLegacy(){
 		l9=(u32)read64(nesds_ex044_lzma+5);
 		cl9=nesds_ex044_lzma_size;
 		p9=nesds_ex044_lzma;
-	}
+	}else{die();} //lol
 
 		l7=(u32)read64(nesds_arm7_lzma+5);
 		cl7=nesds_arm7_lzma_size;
@@ -116,7 +118,7 @@ void Main(){
 	if(keys&(KEY_A|KEY_B|KEY_X|KEY_Y|KEY_L|KEY_START))loadNesDSLegacy();
 
 	u32 l9,cl9;
-	u8* p9;
+	const u8* p9;
 
 	if(keys&KEY_SELECT){
 		l9=(u32)read64(nesterds_nds_lzma+5);
@@ -130,6 +132,10 @@ void Main(){
 		l9=(u32)read64(nesDS_r69_nds_lzma+5);
 		cl9=nesDS_r69_nds_lzma_size;
 		p9=nesDS_r69_nds_lzma;
+	}else if(keys&KEY_DOWN){
+		l9=(u32)read64(nesDS_r87_nds_lzma+5);
+		cl9=nesDS_r87_nds_lzma_size;
+		p9=nesDS_r87_nds_lzma;
 	}else{
 		l9=(u32)read64(nesDS_nds_lzma+5);
 		cl9=nesDS_nds_lzma_size;
