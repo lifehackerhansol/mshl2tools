@@ -14,7 +14,7 @@
 //ARM7 not officially supported
 #define printf _consolePrintf2
 
-const byte *dldimagic=(byte*)"\xed\xa5\x8d\xbf Chishm";
+static const byte *dldimagic=(byte*)"\x00\xa5\x8d\xbf Chishm";
 
 //OK now we are prepared. DLDI routine follows.
 
@@ -35,6 +35,7 @@ int tunedldi(const char *name, const char *id, int *size, byte **p, int checksta
 #define torelative(n) (read32(pA+n)-pAdata)
 
 int dldi2(byte *nds,const int ndslen,const int bypassYSMenu,const char* dumpname){
+	*(byte*)dldimagic=0xed;
 	byte *pD=DLDIToBoot;
 	int dldilen;
 

@@ -1,7 +1,7 @@
 /*
 	fat.h
 	Simple functionality for startup, mounting and unmounting of FAT-based devices.
-	
+
  Copyright (c) 2006 - 2009
 	Michael "Chishm" Chisholm
 	Dave "WinterMute" Murphy
@@ -71,7 +71,7 @@ extern bool fatInitDefault (void);
 /*
 Mount the device pointed to by interface, and set up a devoptab entry for it as "name:".
 You can then access the filesystem using "name:/".
-This will mount the active partition or the first valid partition on the disc, 
+This will mount the active partition or the first valid partition on the disc,
 and will use a cache size optimized for the host system.
 */
 extern bool fatMountSimple (const char* name, const DISC_INTERFACE* interface);
@@ -96,6 +96,22 @@ extern void fatUnmount (const char* name);
 Get Volume Label
 */
 extern void fatGetVolumeLabel (const char* name, char *label);
+
+// File attributes
+#define ATTR_ARCHIVE	0x20			// Archive
+#define ATTR_DIRECTORY	0x10			// Directory
+#define ATTR_VOLUME		0x08			// Volume
+#define ATTR_SYSTEM		0x04			// System
+#define ATTR_HIDDEN		0x02			// Hidden
+#define ATTR_READONLY	0x01			// Read only
+
+/*
+Methods to modify DOS File Attributes
+*/
+int	FAT_getAttr(const char *file);
+int	FAT_setAttr(const char *file, uint8_t attr );
+
+#define LIBFAT_FEOS_MULTICWD
 
 #ifdef __cplusplus
 }

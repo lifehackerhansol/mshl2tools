@@ -10,7 +10,7 @@ const int useARM7Bios=0;
 #define CLUSTER_FIRST	0x00000002
 #define CLUSTER_ERROR	0xFFFFFFFF
 
-int fsetClusterMap(int fd, u32 *clustmap){
+static int fsetClusterMap(int fd, u32 *clustmap){
 	u32 clust,tmp,ret=1;
 	u32 p=getPartitionHandle();
 	if(!p)return -1;
@@ -24,18 +24,18 @@ int fsetClusterMap(int fd, u32 *clustmap){
 	return ret;
 }
 
-volatile u32 getTrueSector(u32 sec, u32 isSave){
+static u32 getTrueSector(u32 sec, u32 isSave){
 	u32 area;
 	sec>>=9; //physical addr -> sector
 	//512MB ROMs use 16384 clusters. 64MB SAVs use 2048 clusters. Map Total 73728bytes.
 	area=sec%64;
 	sec>>=6; //compress to 1/64
 	if(isSave)sec+=16384;
-	return (((u32*)0x023d0000)[sec] << 6) + *(u32*)0x023e2000 + area;
+	return (((vu32*)0x02fd0000)[sec] << 6) + *(vu32*)0x02fe2000 + area;
 }
 
-u8 WooD_DLDI[]={
-	0xED,0xA5,0x8D,0xBF,0x20,0x43,0x68,0x69,0x73,0x68,0x6D,0x00,0x01,0x0F,0x00,0x0F,
+static u8 WooD_DLDI[]={
+	0x00,0xA5,0x8D,0xBF,0x20,0x43,0x68,0x69,0x73,0x68,0x6D,0x00,0x01,0x0F,0x00,0x0F,
 	0x44,0x75,0x6D,0x6D,0x79,0x20,0x44,0x4C,0x44,0x49,0x20,0x66,0x6F,0x72,0x20,0x57,
 	0x6F,0x6F,0x64,0x20,0x44,0x69,0x73,0x74,0x6F,0x72,0x74,0x69,0x6F,0x6E,0x00,0x00,
 	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -46,8 +46,7 @@ u8 WooD_DLDI[]={
 	0x00,0x00,0xA0,0xE3,0x1E,0xFF,0x2F,0xE1,
 };
 
-void Main(){
-	char file[256*3]="MoonShellExecute\0\0\0\0\0\0\0\0\0\0\0" //will be modified externally
+static char file[256*3]="MoonShellExecute\0\0\0\0\0\0\0\0\0\0\0" //will be modified externally
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
@@ -73,6 +72,9 @@ void Main(){
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"; //744 paddings
+
+void Main(){
+	*WooD_DLDI=0xED;
 
 	_consolePrintf(
 		"reset_mse_arco\n"
@@ -112,7 +114,8 @@ void Main(){
 	//We don't need libfat
 	disc_unmount();
 
-	//Now that we have lost FAT...et's cast the spell.
+	//Now that we have lost FAT, let's cast the spell.
+	//Basically, we can copy DLDI template to 0x02fe8000 then patch it again.
 	memcpy((u8*)0x02fe8000,WooD_DLDI,sizeof(WooD_DLDI));
 	dldi2((u8*)0x02fe8000,32768,0,NULL);
 	typedef bool (*type_dldiStartup)();

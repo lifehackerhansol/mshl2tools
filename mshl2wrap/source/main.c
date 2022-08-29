@@ -2,17 +2,10 @@
 const u16 bgcolor=RGB15(0,8,8);
 const int useARM7Bios=0;
 
-char *template="*mshl2wrap link template";
-char ext[64][768];
+static char *template="*mshl2wrap link template";
+static char ext[64][768];
 
-void Main(){
-	FILE *f;
-	//TExtLinkBody extlink;
-	int size,hbmode=0;
-	//ERESET RESET=RESET_NULL;
-	int flag=0;
-
-	char target[256*3]=
+static char target[256*3]=
 				//"GUIDDIUG\0\0\0\0\0\0\0\0\0\0\0\0"
 				"mshl2wrap link template\0\0\0\0" //will be modified from external link maker
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
@@ -40,6 +33,13 @@ void Main(){
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"; //744 paddings
+
+void Main(){
+	FILE *f;
+	//TExtLinkBody extlink;
+	int size,hbmode=0;
+	//ERESET RESET=RESET_NULL;
+	int flag=0;
 
 	char loader[256*3];
 	char utf8[768];

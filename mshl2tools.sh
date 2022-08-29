@@ -35,16 +35,16 @@ cp -f reset_r4/R4TF.nds DSEM/resource/REBOOT.dat
 cp -f ysall/ysall.nds DSEM/resource/
 cp -f yswood/yswood.nds DSEM/resource/
 cp -f woodload/woodload.nds DSEM/resource/
-cp -f inilink/{nds.inilink.nds,inilink.ini} DSEM/extlink/
+cp -f inilink/nds.inilink.nds inilink/inilink.ini DSEM/extlink/
 cp -f ak2loader/nds.ak2loader.nds DSEM/extlink/
 cp -f akaioms2/nds.akaioms2.nds DSEM/extlink/
 cp -f akaioysl/akloader.nds DSEM/resource/akloader_akaioysl.nds
 cp -f akysload/akloader.nds DSEM/resource/akloader_akysload.nds
-cp -f m3loader/{nds.m3loader.nds,m3loader.ini} DSEM/extlink/
-cp -f mshl2wrap/{nds.mshl2wrap.nds,mshl2wrap.ini} DSEM/extlink/
+cp -f m3loader/nds.m3loader.nds m3loader/m3loader.ini DSEM/extlink/
+cp -f mshl2wrap/nds.mshl2wrap.nds mshl2wrap/mshl2wrap.ini DSEM/extlink/
 cp -f vhbootlib/_vh.bootlib.nds DSEM/extlink/
 cp -f r4loader/nds.r4loader.nds DSEM/extlink/
-cp -f dldi_m3r4/{r4tf,m3r4,ttio}.dldi DSEM/dldi/
+cp -f dldi_m3r4/r4tf.dldi dldi_m3r4/m3r4.dldi dldi_m3r4/ttio.dldi DSEM/dldi/
 cp -f dldi_m3r4/scds.dldi DSEM/dldi/scdssdhc1.dldi
 cd DSEM
 7z a -r0 -mx=9 ../mshl2tools_DSEM.7z *

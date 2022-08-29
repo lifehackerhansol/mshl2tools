@@ -45,6 +45,84 @@
 #include "filetime.h"
 #include "lock.h"
 
+bool _FAT_findEntry(const char *path, DIR_ENTRY *dirEntry) {
+	PARTITION *partition = _FAT_partition_getPartitionFromPath(path);
+
+	// Check Partition
+	if( !partition )
+		return false;
+
+	// Move the path pointer to the start of the actual path
+	if (strchr (path, ':') != NULL) {
+		path = strchr (path, ':') + 1;
+	}
+	if (strchr (path, ':') != NULL) {
+		return false;
+	}
+
+	// Search for the file on the disc
+	return _FAT_directory_entryFromPath (partition, dirEntry, path, NULL);
+}
+
+int	FAT_getAttr(const char *file) {
+	DIR_ENTRY dirEntry;
+	if (!_FAT_findEntry(file,&dirEntry)) return -1;
+
+	return dirEntry.entryData[DIR_ENTRY_attributes];
+}
+
+int FAT_setAttr(const char *file, uint8_t attr) {
+
+	// Defines...
+	DIR_ENTRY_POSITION entryEnd;
+	PARTITION *partition = NULL;
+	DIR_ENTRY dirEntry;
+
+	// Get Partition
+	partition = _FAT_partition_getPartitionFromPath( file );
+
+	// Check Partition
+	if( !partition )
+		return -1;
+
+	// Move the path pointer to the start of the actual path
+	if (strchr (file, ':') != NULL)
+		file = strchr (file, ':') + 1;
+	if (strchr (file, ':') != NULL)
+		return -1;
+
+	// Get DIR_ENTRY
+	if( !_FAT_directory_entryFromPath (partition, &dirEntry, file, NULL) )
+		return -1;
+
+	// Get Entry-End
+	entryEnd = dirEntry.dataEnd;
+
+	// Lock Partition
+	_FAT_lock(&partition->lock);
+
+
+	// Write Data
+	_FAT_cache_writePartialSector (
+		partition->cache // Cache to write
+		, &attr // Value to be written
+		, _FAT_fat_clusterToSector( partition , entryEnd.cluster ) + entryEnd.sector // cluster
+		, entryEnd.offset * DIR_ENTRY_DATA_SIZE + DIR_ENTRY_attributes // offset
+		, 1 // Size in bytes
+	);
+
+	// Flush any sectors in the disc cache
+	if ( !_FAT_cache_flush( partition->cache ) ) {
+		_FAT_unlock(&partition->lock); // Unlock Partition
+		return -1;
+	}
+
+	// Unlock Partition
+	_FAT_unlock(&partition->lock);
+
+	return 0;
+}
+
 int _FAT_open_r (struct _reent *r, void *fileStruct, const char *path, int flags, int mode) {
 	PARTITION* partition = NULL;
 	bool fileExists;

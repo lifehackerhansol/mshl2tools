@@ -102,9 +102,10 @@ static const devoptab_t dotab_elm=
 #ifdef _LIBNDS_MAJOR_
   _ELM_ftruncate_r, /* ftruncate */
   _ELM_fsync_r,     /* fsync     */
-  NULL,             /* Device data */
-  NULL,
-  NULL
+  NULL,	/* Device data */
+  NULL,	// chmod_r
+  NULL,	// fchmod_r
+  NULL	// rmdir_r
 #endif
 };
 
