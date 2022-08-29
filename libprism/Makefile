@@ -1,3 +1,6 @@
+#export LIBFAT=1
+#export LIBELM=1
+
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
@@ -6,6 +9,14 @@ $(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>dev
 endif
 
 include $(DEVKITARM)/ds_rules
+
+ifdef LIBFAT
+export FAT_Driver=$(LIBNDS)/lib/libfat.a
+export FAT_Flag=-DLIBFAT
+else
+export FAT_Driver=$(LIBNDS)/lib/libelm.a
+export FAT_Flag=-DLIBELM
+endif
 
 #---------------------------------------------------------------------------------
 # BUILD is the directory where object files & intermediate files will be placed
@@ -28,7 +39,7 @@ ARCH	:=	-mthumb -mthumb-interwork
 # *insists* it has a FPU or VFP, and it won't take no for an answer!
 CFLAGS	:=	-Wall -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
-			-ffast-math -fdata-sections \
+			-ffast-math -fdata-sections $(FAT_Flag) \
 			$(ARCH)
 
 CFLAGS	+=	$(INCLUDE) -DARM9
@@ -40,7 +51,7 @@ ASFLAGS	:=	$(ARCH)
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-#LIBS	:= -lfat -lnds9
+#LIBS	:= -lnds9
  
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -113,7 +124,8 @@ DEPENDS	:=	$(OFILES:.o=.d)
 #---------------------------------------------------------------------------------
 $(ARM9BIN)	:	$(OFILES)
 	@rm -f "$(ARM9BIN)"
-	@$(AR) rcs "$(ARM9BIN)" $(OFILES)
+	@cp -f $(FAT_Driver) "$(ARM9BIN)"
+	@$(AR) rs "$(ARM9BIN)" $(OFILES)
 	@echo built ... $(notdir $@)
 
 #---------------------------------------------------------------------------------
@@ -123,7 +135,6 @@ $(ARM9BIN)	:	$(OFILES)
 #---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	@$(bin2o)
-
 
 -include $(DEPENDS)
  

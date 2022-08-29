@@ -1,11 +1,10 @@
 /***********************************************************
 	Arm9 Soft rest for General purpose
 
-		by Rudolph (çcíÈ)
+		by Rudolph
 ***************************************************************/
 
 #include <nds.h>
-#include <nds/registers_alt.h>
 #include "libprism.h"
 
 static inline void _dmaFillWords(const void* src, void* dest, uint32 size) {
@@ -45,16 +44,17 @@ bool ret_menu9_GenM2(const char *menu_nam,const int bypassYSMenu,const char* dum
 
 	fclose(ldr);
 
-	*(vu32*)0x027FFDF4=(u32)ldrBuf;
+	*memUncachedAddr(0x02fFFDF4)=(u32)ldrBuf;
 	if(ret_menu9_callback)ret_menu9_callback(ldrBuf);
 
-	installargv(ldrBuf,(char*)0x023ff400,menu_nam);
-	_consolePrintf("applying dldi...\n"); //Actually ldrBuf isn't a NDS itself, dldi patching works.
+	installargv(ldrBuf,(char*)0x02fff400,menu_nam);
+	_consolePrint("applying dldi...\n"); //Actually ldrBuf isn't a NDS itself, dldi patching works.
 	dldi2(ldrBuf,siz,bypassYSMenu,dumpname);
+	disc_unmount();
 
-	_consolePrintf("Rebooting...\n");
+	_consolePrint("Rebooting...\n");
+	NotifyARM7(ResetRudolphM);
 	DC_FlushAll();
-	IPCZ->cmd=ResetRudolphM;
 
 	//start
  	register int i;
@@ -68,15 +68,15 @@ bool ret_menu9_GenM2(const char *menu_nam,const int bypassYSMenu,const char* dum
 	}
 
 	VRAM_CR = 0x80808080;
-	(*(vu32*)0x027FFE04) = 0;   // temporary variable
+	(*(vu32*)0x02fFFE04) = 0;   // temporary variable
 	//BG_PALETTE[0] = 0xFFFF;
-	_dmaFillWords((void*)0x027FFE04, BG_PALETTE, (2*1024));
-	_dmaFillWords((void*)0x027FFE04, BG_PALETTE_SUB, (2*1024));
-	_dmaFillWords((void*)0x027FFE04, OAM,     2*1024);
-	_dmaFillWords((void*)0x027FFE04, OAM_SUB,     2*1024);
-	_dmaFillWords((void*)0x027FFE04, (void*)0x04000000, 0x56);  //clear main display registers
-	_dmaFillWords((void*)0x027FFE04, (void*)0x04001000, 0x56);  //clear sub  display registers
-	_dmaFillWords((void*)0x027FFE04, VRAM,  656*1024);
+	_dmaFillWords((void*)0x02fFFE04, BG_PALETTE, (2*1024));
+	_dmaFillWords((void*)0x02fFFE04, BG_PALETTE_SUB, (2*1024));
+	_dmaFillWords((void*)0x02fFFE04, OAM,     2*1024);
+	_dmaFillWords((void*)0x02fFFE04, OAM_SUB,     2*1024);
+	_dmaFillWords((void*)0x02fFFE04, (void*)0x04000000, 0x56);  //clear main display registers
+	_dmaFillWords((void*)0x02fFFE04, (void*)0x04001000, 0x56);  //clear sub  display registers
+	_dmaFillWords((void*)0x02fFFE04, VRAM,  656*1024);
 	
 	REG_DISPSTAT=0;
 	videoSetMode(0);
@@ -91,11 +91,11 @@ bool ret_menu9_GenM2(const char *menu_nam,const int bypassYSMenu,const char* dum
 	VRAM_H_CR = 0;
 	VRAM_I_CR = 0;
 	VRAM_CR   = 0x00000000;
-	POWER_CR  = 0x820F;
-	REG_EXMEMCNT = 0xe880;
+	REG_POWERCNT = 0x820F;
+	//REG_EXMEMCNT = 0xe880;
 
 	//set shared ram to ARM7
-	//WRAM_CR = 0x03;
+	WRAM_CR = 0x03;
 
 	REG_IME = 0;
 	REG_IE = 0;
@@ -106,14 +106,25 @@ bool ret_menu9_GenM2(const char *menu_nam,const int bypassYSMenu,const char* dum
 	DC_InvalidateAll();
 
 	//r0 and r1 are destroyed
+if(GetRunningMode()){
 	asm(
-     		"ldr	r0, =0x027FFDF8\n"
+     		"ldr	r0, =0x0cfFFDF8\n"
      		"ldr	r1, =0xE51FF004\n"
-    	 	"str	r1, [r0, #0x0]\n"			// (027ffdf8)=E51FF004:ldr r15,[r15, #-0x4]
-    	 	"str	r0, [r0, #0x4]\n"			// (027ffdfC)=027FFDF8
+    	 	"str	r1, [r0, #0x0]\n"			// (0cfffdf8)=E51FF004:ldr r15,[r15, #-0x4]
+    	 	"str	r0, [r0, #0x4]\n"			// (0cfffdfC)=0cfFFDF8
 
-		"bx	r0\n"				// JUMP 027FFDF8
+		"bx	r0\n"				// JUMP 0cfFFDF8
 	);
+}else{
+	asm(
+     		"ldr	r0, =0x02fFFDF8\n"
+     		"ldr	r1, =0xE51FF004\n"
+    	 	"str	r1, [r0, #0x0]\n"			// (02fffdf8)=E51FF004:ldr r15,[r15, #-0x4]
+    	 	"str	r0, [r0, #0x4]\n"			// (02fffdfC)=02fFFDF8
+
+		"bx	r0\n"				// JUMP 02fFFDF8
+	);
+}
 	while(1);
 }
 

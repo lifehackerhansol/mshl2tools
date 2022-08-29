@@ -1,11 +1,10 @@
 /***********************************************************
 	Arm9 Soft rest for General purpose
 
-		by Rudolph (çcíÈ)
+		by Rudolph
 ***************************************************************/
 
 #include <nds.h>
-//#include <nds/registers_alt.h>	// devkitPror20
 #include "libprism.h"
 
 bool ret_menu9_Gen2(const char *menu_nam,const int bypassYSMenu,const char* dumpname){
@@ -38,18 +37,21 @@ bool ret_menu9_Gen2(const char *menu_nam,const int bypassYSMenu,const char* dump
 
 	fclose(ldr);
 
-	*(vu32*)0x027FFDF4=(u32)ldrBuf;
+	*memUncachedAddr(0x02fFFDF4)=(u32)ldrBuf;
 	if(ret_menu9_callback)ret_menu9_callback(ldrBuf);
 
-	installargv(ldrBuf,(char*)0x023ff400,menu_nam);
-	_consolePrintf("applying dldi...\n"); //Actually ldrBuf isn't a NDS itself, dldi patching works.
+	installargv(ldrBuf,(char*)0x02fff400,menu_nam);
+	_consolePrint("applying dldi...\n"); //Actually ldrBuf isn't a NDS itself, dldi patching works.
 	dldi2(ldrBuf,siz,bypassYSMenu,dumpname);
+	disc_unmount();
 
-	_consolePrintf("Rebooting...\n");
+	_consolePrint("Rebooting...\n");
+	NotifyARM7(ResetRudolph);
+	IC_InvalidateAll();
 	DC_FlushAll();
-	IPCZ->cmd=ResetRudolph;
+	DC_InvalidateAll();
 	ret_menu9_GENs();
-	_consolePrintf("Failed.\n");die();
+	_consolePrint("Failed.\n");die();
 }
 
 bool ret_menu9_Gen(const char *menu_nam){return ret_menu9_Gen2(menu_nam,0,NULL);}

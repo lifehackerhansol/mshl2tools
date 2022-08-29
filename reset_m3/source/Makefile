@@ -24,7 +24,7 @@ clean:
 	dldipatch	../../xenofile/source/dldi/g003.dldi G003.nds
 	rm		$(TARGET).mse
 	mv -f		$(TARGET).nds ../
-	dsbize		../$(TARGET).nds ../g6dsload.eng 0x12
+	dsbize		../$(TARGET).nds ../menu.xx 0x12
 	mv -f		G003.nds ../
 	dsbize		../G003.nds ../g003rest.dat 0x23
 
@@ -37,7 +37,7 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 			-I$(CURDIR)
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
-LIBS	:= ../../libprism/libprism.a -lfat -lnds9
+LIBS	:= ../../libprism/libprism.a -lnds9
 ARCH	:=	-mthumb -mthumb-interwork
 CFLAGS	:=	-Wall -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \

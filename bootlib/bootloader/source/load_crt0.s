@@ -28,6 +28,7 @@
 	.global wantToPatchDLDI
 	.global argStart
 	.global argSize
+	.global dsiSD
 @---------------------------------------------------------------------------------
 	.align	4
 	.arm
@@ -49,6 +50,8 @@ argSize:
 	.word	0x00000000
 dldiOffset:
 	.word	_dldi_start - _start
+dsiSD:
+	.word	0
 	
 startUp:
 	mov	r0, #0x04000000		@ IME = 0;

@@ -1,13 +1,18 @@
 #include "libprism.h"
+
+#if !defined(_LIBNDS_MAJOR_)
 #include <nds/registers_alt.h>  //to maintain r23
+#endif
 
 extern void Main();
 extern const u16 bgcolor;
 
-u8 libprism_buf[65536];
+u8 libprism_buf[BUFLEN];
 
 char myname[768],mypath[768];
+char argname[768],argpath[768];
 char libprism_name[768];
+bool fpassarg;
 
 byte *DLDIToBoot;
 type_printf PrintfToDie;
@@ -18,6 +23,18 @@ u16 *b15ptrMain=(u16*)0x06008000;
 u16 *b15ptrSub=(u16*)0x06208000;
 
 char __sig_mode[8]="\xFE""cMode\x01";
+
+const byte DLDINull[]={
+	0x00,0xA5,0x8D,0xBF,0x20,0x43,0x68,0x69,0x73,0x68,0x6D,0x00,0x01,0x0F,0x00,0x0F,
+	0x44,0x65,0x66,0x61,0x75,0x6C,0x74,0x20,0x28,0x4E,0x6F,0x20,0x69,0x6E,0x74,0x65,
+	0x72,0x66,0x61,0x63,0x65,0x29,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x00,0x00,0x80,0xbf,0x88,0x00,0x80,0xbf,0x88,0x00,0x80,0xbf,0x88,0x00,0x80,0xbf,
+	0x88,0x00,0x80,0xbf,0x88,0x00,0x80,0xbf,0x88,0x00,0x80,0xbf,0x88,0x00,0x80,0xbf,
+	0x44,0x4c,0x44,0x49,0x23,0x00,0x00,0x00,0x80,0x00,0x80,0xbf,0x80,0x00,0x80,0xbf,
+	0x80,0x00,0x80,0xbf,0x80,0x00,0x80,0xbf,0x80,0x00,0x80,0xbf,0x80,0x00,0x80,0xbf,
+	0x00,0x00,0xA0,0xE3,0x1E,0xFF,0x2F,0xE1,
+};
 
 inline void SetARM9_REG_WaitCR(){
 	u16 bw=REG_EXMEMCNT;
@@ -38,7 +55,70 @@ inline void SetARM9_REG_WaitCR(){
   
 	REG_EXMEMCNT=bw;
 }
+#if 0
+inline void fillMemory( void * addr, u32 count, u32 value ){
+	swiFastCopy( (void*)(&value), addr, (count>>2) | COPY_MODE_WORD | COPY_MODE_FILL);
+}
+inline void zeroMemory( void * addr, u32 count ){
+	fillMemory( addr, count, 0 );
+}
 
+void resetARM9Video()
+{
+	//REG_IME=0;
+	// DMA
+	u8 i=0;
+	for(; i<4; i++){
+		DMA_CR(i) = 0;
+		DMA_SRC(i) = 0;
+		DMA_DEST(i) = 0;
+		TIMER_CR(i) = 0;
+		TIMER_DATA(i) = 0;
+	}
+
+	// VIDEO
+	// trun on vram banks for clear
+	VRAM_CR = 0x80808080;
+	VRAM_E_CR = 0x80;
+	VRAM_F_CR = 0x80;
+	VRAM_G_CR = 0x80;
+	VRAM_H_CR = 0x80;
+	VRAM_I_CR = 0x80;
+	// clear vram
+	zeroMemory( VRAM, 656 * 1024 );
+	// clear video palette
+	zeroMemory( BG_PALETTE, 2048 );//PALETTE[0] = RGB15(1,1,1);
+	zeroMemory( BG_PALETTE_SUB, 2048 );
+	// clear video object attribution memory
+	zeroMemory( OAM, 2048 );
+	zeroMemory( OAM_SUB, 2048 );
+	// clear video object data memory
+	zeroMemory( SPRITE_GFX, 128 * 1024 );
+	zeroMemory( SPRITE_GFX_SUB, 128 * 1024 );
+	// clear main display registers
+	zeroMemory( (void*)0x04000008, 0x4e );
+	// clear sub display registers
+	zeroMemory( (void*)0x04001008, 0x4e );
+	
+	// clear video registers
+	//REG_DISPSTAT = DISP_IN_VBLANK;
+	SetYtrigger(80);
+
+	REG_DISPCNT = 0;
+	REG_DISPCNT_SUB = 0;
+	VRAM_A_CR = 0;
+	VRAM_B_CR = 0;
+	VRAM_C_CR = 0;
+	VRAM_D_CR = 0;
+	VRAM_E_CR = 0;
+	VRAM_F_CR = 0;
+	VRAM_G_CR = 0;
+	VRAM_H_CR = 0;
+	VRAM_I_CR = 0;
+	VRAM_CR   = 0x00000000;
+	//REG_IME=1;
+}
+#endif
 void EnableB15Main(){
 	videoSetMode(MODE_4_2D | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
 }
@@ -55,11 +135,29 @@ void DisableB15Sub(){
 	videoSetModeSub(MODE_4_2D | DISPLAY_BG2_ACTIVE);
 }
 
+TransferRegionZ volatile *IPCZ;
 int main(){
-	POWER_CR = (u16)POWER_ALL_2D;
-	POWER_CR |= POWER_SWAP_LCDS;
+	IPCZ=(*(vu32*)0x04004000)?IPCZ_DSiMode:IPCZ_DSMode;
+	//IPCZ=IPCZ_DSMode;
 
-	SetARM9_REG_WaitCR();
+	//SetARM9_REG_WaitCR();
+	sysSetBusOwners( BUS_OWNER_ARM9, BUS_OWNER_ARM9 );
+	//resetARM9Video();
+
+/// I never know about side-effects.
+#ifdef _LIBNDS_MAJOR_
+	REG_MASTER_BRIGHT_SUB = REG_MASTER_BRIGHT = 0;
+#else
+	SUB_BRIGHTNESS = BRIGHTNESS = 0;
+#endif
+	//GFX_CONTROL = 0;
+	//GFX_STATUS = 0x06000000;
+	//memset((void*)0x04000640,0,0x70);
+	//REG_IF = 0x00080000;
+///
+
+	REG_POWERCNT = (u16)POWER_ALL_2D;
+	REG_POWERCNT |= POWER_SWAP_LCDS;
 
 #ifdef _LIBNDS_MAJOR_
 	//fifoInit();
@@ -67,21 +165,46 @@ int main(){
 	irqInit();
 	irqEnable(IRQ_VBLANK);
 #endif
-	REG_IME=0;
+	//REG_IME=0;
 
 	DLDIToBoot=DLDIDATA;
+	*(byte*)DLDINull=0xed;
 	PrintfToDie=_consolePrintf;
 	ret_menu9_callbackpre=NULL;
 	ret_menu9_callback=NULL;
+
+	consolePrint_callback=NULL;
+	consolePrint2_callback=NULL;
+	consolePrintOnce_callback=NULL;
+	consolePrintOnce2_callback=NULL;
+
+	consolePrintProgress_callback=NULL;
+	consolePrintProgress2_callback=NULL;
+
+	consoleClear_callback=NULL;
+	consoleClear2_callback=NULL;
+	consolePrintOnceEnd_callback=NULL;
+	consolePrintOnceEnd2_callback=NULL;
+	consoleStartProgress_callback=NULL;
+	consoleStartProgress2_callback=NULL;
+	consoleEndProgress_callback=NULL;
+	consoleEndProgress2_callback=NULL;
+
+	fpassarg=false;
 
 	//InitVRAM
 	//From 0.51m, you can use BG_BMP_RAM(2)/BG_BMP_RAM_SUB(2) (u16 [256*192]) to display image.
 	EnableB15Main();
 	EnableB15Sub();
-  
-	vramSetMainBanks(
+
+#ifdef _LIBNDS_MAJOR_
+	vramSetPrimaryBanks
+#else
+	vramSetMainBanks
+#endif
+	(
 		VRAM_A_MAIN_BG_0x06000000,
-		VRAM_B_MAIN_BG_0x06020000,
+		0x82, //VRAM_B_LCD, //MAIN_BG_0x06020000,
 		//VRAM_B_MAIN_SPRITE_0x06400000,
 		VRAM_C_SUB_BG_0x06200000,
 		//VRAM_C_MAIN_BG_0x06020000,
@@ -96,44 +219,49 @@ int main(){
 	vramset(b15ptrMain,0,256*192);
 	vramset(b15ptrSub,0,256*192);
 
+	REG_BG0CNT = 0;
+	REG_BG0CNT_SUB = 0;
+	REG_BG1CNT = 0;
+	REG_BG1CNT_SUB = 0;
+
 	{
-		BG2_CR = BG_COLOR_256 | BG_RS_64x64 | BG_MAP_BASE(8) | BG_TILE_BASE(0) | BG_PRIORITY_3; // Tile16kb Map2kb(64x32)
+		REG_BG2CNT = BG_COLOR_256 | BG_RS_64x64 | BG_MAP_BASE(8) | BG_TILE_BASE(0) | BG_PRIORITY_1; // Tile16kb Map2kb(64x32)
 
 		BG_PALETTE[(0*16)+0] = RGB15(0,0,0); // unuse (transparent)
 		BG_PALETTE[(0*16)+1] = BG_PALETTE[(0*16)+2] = bgcolor | BIT(15); // BG color
 		//BG_PALETTE[(0*16)+2] = RGB15(0,0,0) | BIT(15); // Shadow color
 		BG_PALETTE[(0*16)+3] = RGB15(31,31,31) | BIT(15); // Text color
 
-		u16 XDX=(u16)((8.0/6)*0x100);
-		u16 YDY=(u16)((8.0/6)*0x100);
+		u16 XDX=341; //(u16)((8.0/6)*0x100);
+		u16 YDY=341; //(u16)((8.0/6)*0x100);
 
-		BG2_XDX = XDX;
-		BG2_XDY = 0;
-		BG2_YDX = 0;
-		BG2_YDY = YDY;
+		REG_BG2PA = XDX;
+		REG_BG2PB = 0;
+		REG_BG2PC = 0;
+		REG_BG2PD = YDY;
 
-		BG2_CX=-1;
-		BG2_CY=-1;
+		REG_BG2X=-1;
+		REG_BG2Y=-1;
 
 		//consoleInit() is a lot more flexible but this gets you up and running quick
 		_consoleInitDefault((u16*)(SCREEN_BASE_BLOCK(8)), (u16*)(CHAR_BASE_BLOCK(0)));
 		_consoleClear();
-		_consolePrintf("Main screen init OK.\n\n");
+		_consolePrint("Main screen init OK.\n\n");
 	}
 
 	{
-		BG3_CR = BG_BMP16_256x256 | BG_BMP_BASE(2) | BG_PRIORITY_1;
+		REG_BG3CNT = BG_BMP16_256x256 | BG_BMP_BASE(2) | BG_PRIORITY_0;
 
-		BG3_YDX = 0;
-		BG3_XDX = 1 << 8;
-		BG3_XDY = 0;
-		BG3_YDY = 1 << 8;
-		BG3_CX = 0;
-		BG3_CY = 0;
+		REG_BG3PA = 1 << 8;
+		REG_BG3PB = 0;
+		REG_BG3PC = 0;
+		REG_BG3PD = 1 << 8;
+		REG_BG3X = 0;
+		REG_BG3Y = 0;
 	}
   
 	{
-		SUB_BG2_CR = BG_COLOR_256 | BG_RS_64x64 | BG_MAP_BASE(8) | BG_TILE_BASE(0) | BG_PRIORITY_3; // Tile16kb Map2kb(64x32)
+		REG_BG2CNT_SUB = BG_COLOR_256 | BG_RS_64x64 | BG_MAP_BASE(8) | BG_TILE_BASE(0) | BG_PRIORITY_1; // Tile16kb Map2kb(64x32)
 
 		if(__sig_mode[6]==1){
 			BG_PALETTE_SUB[(0*16)+0] = RGB15(0,0,0); // unuse (transparent)
@@ -146,64 +274,120 @@ int main(){
 			//BG_PALETTE_SUB[(0*16)+2] = RGB15(0,0,0) | BIT(15); // Shadow color
 			BG_PALETTE_SUB[(0*16)+3] = RGB15(0,0,0) | BIT(15); // Text color
 		}else{
-			_consolePrintf("\\xFEcMode? signature has to be \\x01 or \\x02.\n");die();
+			_consolePrint("\\xFEcMode? signature has to be \\x01 or \\x02.\n");die();
 		}
 
-		u16 XDX=(u16)((8.0/6)*0x100);
-		u16 YDY=(u16)((8.0/6)*0x100);
+		u16 XDX=341; //(u16)((8.0/6)*0x100);
+		u16 YDY=341; //(u16)((8.0/6)*0x100);
 
-		SUB_BG2_XDX = XDX;
-		SUB_BG2_XDY = 0;
-		SUB_BG2_YDX = 0;
-		SUB_BG2_YDY = YDY;
+		REG_BG2PA_SUB = XDX;
+		REG_BG2PB_SUB = 0;
+		REG_BG2PC_SUB = 0;
+		REG_BG2PD_SUB = YDY;
 
-		SUB_BG2_CX=-1;
-		SUB_BG2_CY=-1;
+		REG_BG2X_SUB=-1;
+		REG_BG2Y_SUB=-1;
 
 		//consoleInit() is a lot more flexible but this gets you up and running quick
 		_consoleInitDefault2((u16*)(SCREEN_BASE_BLOCK_SUB(8)), (u16*)(CHAR_BASE_BLOCK_SUB(0)));
 		_consoleClear2();
-		_consolePrintf2("Sub screen init OK.\n\n");
+		_consolePrint2("Sub screen init OK.\n\n");
 	}
 
 	{
-		SUB_BG3_CR = BG_BMP16_256x256 | BG_BMP_BASE(2) | BG_PRIORITY_1;
+		REG_BG3CNT_SUB = BG_BMP16_256x256 | BG_BMP_BASE(2) | BG_PRIORITY_0;
 
-		SUB_BG3_YDX = 0;
-		SUB_BG3_XDX = 1 << 8;
-		SUB_BG3_XDY = 0;
-		SUB_BG3_YDY = 1 << 8;
-		SUB_BG3_CX = 0;
-		SUB_BG3_CY = 0;
+		REG_BG3PA_SUB = 1 << 8;
+		REG_BG3PB_SUB = 0;
+		REG_BG3PC_SUB = 0;
+		REG_BG3PD_SUB = 1 << 8;
+		REG_BG3X_SUB = 0;
+		REG_BG3Y_SUB = 0;
 	}
 
 	DisableB15Main();
 	DisableB15Sub();
 
 	if(sizeof(TransferRegionZ)>256){
-		_consolePrintf("TransferRegionZ 256bytes limit exceeded.\n");die();
+		_consolePrint("TransferRegionZ 256bytes limit exceeded. Compilation was bad.\n");die();
 	}
 
 	*myname=0;
 	strcpy(mypath,"/");
+	*argname=0;
+	strcpy(argpath,"/");
 
-	if(*(vu32*)0x023ffe70==0x5f617267){
-		*(vu32*)0x023ffe70=0; //hide it from libfat
-		_consolePrintf2("argv: 0x%08x\n%s\n",*(vu32*)0x023ffe74,*(char**)0x023ffe74);
-		char *arg=*(char**)0x023ffe74;
+	_consolePrint2("Checking ARGV...\n");
+	if(*(vu32*)0x02fffe70==0x5f617267){
+		*(vu32*)0x02fffe70=0; //hide it from libfat
+		_consolePrintf2("argv: 0x%08x\n%s\n",*(vu32*)0x02fffe74,*(char**)0x02fffe74);
+		char *arg=*(char**)0x02fffe74;
 		while(*arg&&*arg!='/')arg++;
 		if(!*arg){
-			_consolePrintf2("warn: no '/' in argv[0], mypath is discarded.\n");
+			_consolePrint2("warn: no '/' in argv[0], mypath is discarded.\n");
 		}else{
 			strcpy(myname,arg);
 			strcpy(mypath,arg);
 			int i=strlen(mypath)+1;
 			for(;i>0;i--)if(mypath[i-1]=='/'){mypath[i]=0;break;}
+
+			if(strlen(*(char**)0x02fffe74)+1<*(vu32*)0x02fffe78){
+				arg=arg+strlen(arg)+1;
+				while(*arg&&*arg!='/')arg++;
+				if(!*arg){
+					//_consolePrint2("warn: no '/' in argv[0], mypath is discarded.\n");
+				}else{
+					strcpy(argname,arg);
+					strcpy(argpath,arg);
+					int i=strlen(argpath)+1;
+					for(;i>0;i--)if(argpath[i-1]=='/'){argpath[i]=0;break;}
+					_consolePrintf2("%s\n",argname);
+				}
+			}
 		}
 		_consolePrint2("\n");
 	}
+#ifndef _LIBNDS_MAJOR_
+	if(!mypath[1]&&*(vu32*)0x027ffe70==0x5f617267){
+		_consolePrint2("Falling back to 0x027xxxxx...\n");
+		*(vu32*)0x027ffe70=0; //hide it from libfat
+		_consolePrintf2("argv: 0x%08x\n%s\n",*(vu32*)0x027ffe74,*(char**)0x027ffe74);
+		char *arg=*(char**)0x027ffe74;
+		while(*arg&&*arg!='/')arg++;
+		if(!*arg){
+			_consolePrint2("warn: no '/' in argv[0], mypath is discarded.\n");
+		}else{
+			strcpy(myname,arg);
+			strcpy(mypath,arg);
+			int i=strlen(mypath)+1;
+			for(;i>0;i--)if(mypath[i-1]=='/'){mypath[i]=0;break;}
 
+			if(strlen(*(char**)0x027ffe74)+1<*(vu32*)0x027ffe78){
+				arg=arg+strlen(arg)+1;
+				while(*arg&&*arg!='/')arg++;
+				if(!*arg){
+					//_consolePrint2("warn: no '/' in argv[0], mypath is discarded.\n");
+				}else{
+					strcpy(argname,arg);
+					strcpy(argpath,arg);
+					int i=strlen(argpath)+1;
+					for(;i>0;i--)if(argpath[i-1]=='/'){argpath[i]=0;break;}
+					_consolePrintf2("%s\n",argname);
+				}
+			}
+		}
+		_consolePrint2("\n");
+	}
+#endif
+
+
+	_consolePrint2("Waiting for ARM7... ");
+	for(;IPCZ->cmd;); //Wait ARM7 initialization
+	_consolePrint2("Start.\n\n");
+	SCDS_SetSDHCModeForDSTT();
+	InitializeKeyTable();
 	Main();
+
 	_consolePrint("Program real Main() end. Finalization seems to have failed.\n");
 	die();
 	return 0; //unreachable
@@ -229,27 +413,36 @@ unsigned int readAddr24(void *mem){
 }
 
 unsigned short readAddr16(void *mem){
-	return (*((unsigned int*)mem))&0xffff;
+	return (*((unsigned short*)mem));
 }
 
 unsigned char readAddr8(void *mem){
-	return (*((unsigned int*)mem))&0xff;
+	return (*((unsigned char*)mem));
+}
+
+unsigned long long int readAddr64(void *mem){
+	return (*((unsigned long long int*)mem));
 }
 
 void writeAddr(void *mem, const unsigned int value){
 	*((unsigned int*)mem) = value;
 }
-
+/*
 void writeAddr24(void *mem, const unsigned int value){
 	*((unsigned int*)mem) = value&0xffffff;
 }
+*/
 
-void writeAddr16(void *mem, const unsigned int value){
-	*((unsigned int*)mem) = value&0xffff;
+void writeAddr16(void *mem, const unsigned short value){
+	*((unsigned short*)mem) = value;
 }
 
-void writeAddr8(void *mem, const unsigned int value){
-	*((unsigned int*)mem) = value&0xff;
+void writeAddr8(void *mem, const unsigned char value){
+	*((unsigned char*)mem) = value;
+}
+
+void writeAddr64(void *mem, const unsigned long long int value){
+	*((unsigned long long int*)mem) = value;
 }
 
 unsigned int read32(const void *p){
@@ -272,6 +465,11 @@ unsigned char read8(const void *p){
 	return x[0];
 }
 
+unsigned long long int read64(const void *p){
+	const unsigned char *x=(const unsigned char*)p;
+	return x[0]|(x[1]<<8)|(x[2]<<16)|(x[3]<<24)|( (unsigned long long int)(x[4]|(x[5]<<8)|(x[6]<<16)|(x[7]<<24)) <<32);
+}
+
 void write32(void *p, const unsigned int n){
 	unsigned char *x=(unsigned char*)p;
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff;
@@ -282,49 +480,51 @@ void write24(void *p, const unsigned int n){
 	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff;
 }
 
-void write16(void *p, const unsigned int n){
+void write16(void *p, const unsigned short n){
 	unsigned char *x=(unsigned char*)p;
 	x[0]=n&0xff,x[1]=(n>>8)&0xff;
 }
 
-void write8(void *p, const unsigned int n){
+void write8(void *p, const unsigned char n){
 	unsigned char *x=(unsigned char*)p;
 	x[0]=n&0xff;
 }
 
+void write64(void *p, const unsigned long long int n){
+	unsigned char *x=(unsigned char*)p;
+	x[0]=n&0xff,x[1]=(n>>8)&0xff,x[2]=(n>>16)&0xff,x[3]=(n>>24)&0xff,
+	x[4]=(n>>32)&0xff,x[5]=(n>>40)&0xff,x[6]=(n>>48)&0xff,x[7]=(n>>56)&0xff;
+}
+
 void die(){
-	int f=0;
+	int f=0,g=0,h=1;
 	struct stat st;
 	char *file="/moonshl2/resetmse/xxxx.nds";
-#ifdef _LIBNDS_MAJOR_
-	extern char *fake_heap_end; //DKPr28:0x023f4000 DKPr23:0x023ff000 I should definitely kill support in r23.
-#endif
+// #ifdef _LIBNDS_MAJOR_
+	u8 *bootstub=(u8*)0x02ff4000;
+	//extern u8 *fake_heap_end; //DKPr28:0x023f4000 DKPr23:0x023ff000 I should definitely kill support in r23.
+// #endif
 
 	ret_menu9_callback=NULL;
 	memcpy(file+19,(char*)DLDIDATA+ioType,4);
-	if(_FAT_partition_getPartitionFromPath("fat:/")&&!stat(file,&st)&&!(st.st_mode&S_IFDIR)&&st.st_size>0)f=1;
+	if(getPartitionHandle()&&!stat(file,&st)&&!(st.st_mode&S_IFDIR)&&st.st_size>0)f=1;
+	if(*(u64*)bootstub==0x62757473746F6F62ULL)g=1;
+
 retry:
 	for(swiWaitForVBlank();;swiWaitForVBlank())
 		if(!IPCZ->keysheld)break;
-#ifdef _LIBNDS_MAJOR_
-	if(*(u64*)fake_heap_end==0x62757473746F6F62ULL){
-		PrintfToDie("Press A to return to menu.\n");
-		if(f)PrintfToDie("Press B for %s.\n",file);
-		for(swiWaitForVBlank();;swiWaitForVBlank()){
-			if(KEY_A&IPCZ->keysheld)exit(0);
-			if(f&&KEY_B&IPCZ->keysheld)
-				if(!BootNDSROM(file)){f=0;goto retry;}
-		}
-	}else
-#endif
-	{
-		PrintfToDie("Press A to shutdown.\n");
-		if(f)PrintfToDie("Press B for %s.\n",file);
-		for(swiWaitForVBlank();;swiWaitForVBlank()){
-			if(KEY_A&IPCZ->keysheld)IPCZ->cmd=Shutdown;
-			if(f&&KEY_B&IPCZ->keysheld)
-				if(!BootNDSROM(file)){f=0;goto retry;}
-		}
+	PrintfToDie("Press A to shutdown.\n");
+	if(h)PrintfToDie("Press B for NDS firmware.\n");
+	if(f)PrintfToDie("Press X for %s.\n",file);
+	if(g)PrintfToDie("Press Y for libnds bootstub.\n");
+	for(swiWaitForVBlank();;swiWaitForVBlank()){
+		if(KEY_A&IPCZ->keysheld)disc_unmount(),IPCZ->cmd=Shutdown;
+		if(h&&(KEY_B&IPCZ->keysheld))
+			{returnDSMenu();h=0;goto retry;}
+		if(f&&(KEY_X&IPCZ->keysheld))
+			if(!BootNDSROM(file)){f=0;goto retry;}
+		if(g&&(KEY_Y&IPCZ->keysheld))
+			disc_unmount(),(*(type_void*)(bootstub+0x08))();
 	}
 }
 
@@ -333,6 +533,13 @@ void Unicode_Copy(UnicodeChar *tag,const UnicodeChar *src){
   while(*src!=0){*tag=*src;tag++; src++;}
   *tag=(UnicodeChar)0;
 }
+/*
+int Unicode_Length(const UnicodeChar *src){
+  int ret=0;
+  while(*src!=0){ret++;src++;}
+  return ret;
+}
+*/
 
 void SplitItemFromFullPathAlias(const char *pFullPathAlias,char *pPathAlias,char *pFilenameAlias){
 	u32 SplitPos=0;
@@ -401,8 +608,8 @@ void rm_rf(char *target){ // last byte has to be '/' *** target itself won't be 
 	if(!target)return;
 	char *targetfile=target+strlen(target);
 	struct stat st;
-	dp=diropen(target);
-	while(!dirnext(dp,targetfile,&st)){
+	dp=mydiropen(target);
+	while(!mydirnext(dp,targetfile,&st)){
 		if(!strcmp(targetfile,".")||!strcmp(targetfile,".."))continue;
 		if(st.st_mode&S_IFDIR){
 			strcat(targetfile,"/");
@@ -411,7 +618,7 @@ void rm_rf(char *target){ // last byte has to be '/' *** target itself won't be 
 			unlink(target);
 		}else unlink(target);
 	}
-	dirclose(dp);
+	mydirclose(dp);
 	*targetfile=0; //genjo fukki!
 }
 
@@ -436,12 +643,13 @@ int copy(const char *old, const char *new){
 	if(!out){fclose(in);return 2;}
 	int size=filelength(fileno(in));
 	int read,cur=0;
+	_consoleStartProgress2();
 	while((read=fread(libprism_buf,1,65536,in))>0){
 		cur+=read;
 		fwrite(libprism_buf,1,read,out);
-		_consolePrintf2("Copying %8d / %8d\r",cur,size); //99MB is enough I think...
+		_consolePrintProgress2("Copying",cur,size);
 	}
-	_consolePrint2("                           \r");
+	_consoleEndProgress2();
 	fclose(out);
 	fclose(in);
 	return 0;
@@ -466,6 +674,12 @@ void installargv(u8 *top, void *store, const char *nds){
 	strcpy((char*)store,"fat:");
 	strcpy((char*)store+4,nds);
 	*(vu32*)(top+0x78)=strlen(nds)+5;
+	if(fpassarg){
+		char *p=(char*)store+strlen(nds)+5;
+		strcpy(p,"fat:");
+		strcpy(p+4,argname);
+		*(vu32*)(top+0x78)+=strlen(argname)+5;
+	}
 }
 
 char *processlinker(const char *name){
@@ -473,7 +687,7 @@ char *processlinker(const char *name){
 	if(!name)return NULL;
 	if(name[strlen(name-1)]!='=')return (char*)name;
 	strcpy(key,name),key[strlen(name)-1]=0;
-	if(!strcpy_safe(buf,findpath(3,(char*[]){"/","/_dstwoplug/",mypath},"linkpath.ini")))return NULL;
+	if(!strcpy_safe(buf,findpath(6,(char*[]){"/","/_dstwoplug/","/ismartplug/","/_iMenu/_ini/","/_plugin_/",mypath},"linkpath.ini")))return NULL;
 	ini_gets("linkpath",key,"",libprism_name,768,buf);
 	return libprism_name[0]?libprism_name:NULL;
 }
@@ -498,8 +712,8 @@ char *getfilename(char *s){
 	int i;
 	if(!s)return NULL;
 	if(!*s)return "";
-	for(i=strlen(s)-1;i>0;i--){
-		if(s[i]=='/'){i++;break;}
+	for(i=strlen(s);i>0;i--){
+		if(s[i-1]=='/'){break;}
 		//if(s[i]=='.')break;
 	}
 	return s+i;
@@ -544,17 +758,36 @@ int validateTM(struct tm *timeParts){
 	return 0;
 }
 
-void slot2nds(){
-	sysSetCartOwner(BUS_OWNER_ARM7);
-	bootMoonlight(0x080000c0);
-	while(1);
+bool slot2nds(){
+	if(IPCZ->NDSType<NDSi){
+		disc_unmount();
+		sysSetCartOwner(BUS_OWNER_ARM7);
+		bootMoonlight(0x080000c0);
+		while(1);
+	}
+	return false;
 }
 
-void slot2gba(int screen){
-	sysSetBusOwners(BUS_OWNER_ARM7,BUS_OWNER_ARM7);
-	REG_POWERCNT=screen?1:(POWER_SWAP_LCDS|1);
-	IPCZ->cmd=Slot2GBA;
-	while(1);
+bool slot2gba(int screen){
+	if(IPCZ->NDSType<NDSi){
+		disc_unmount();
+		sysSetBusOwners(BUS_OWNER_ARM7,BUS_OWNER_ARM7);
+		REG_POWERCNT=screen?1:(POWER_SWAP_LCDS|1);
+		NotifyARM7(Slot2GBA);
+		while(1);
+	}
+	return false;
+}
+
+bool jumpBootStub(){
+// #ifdef _LIBNDS_MAJOR_ //r23 modified crt0 removes this limitation.
+	u8 *bootstub=(u8*)0x02ff4000;
+	if(*(u64*)bootstub==0x62757473746F6F62ULL){
+		disc_unmount();
+		(*(type_void*)(bootstub+0x08))();
+	}
+// #endif
+	return false;
 }
 
 bool isHomebrew(u8 *head){ //at least 0xc0 bytes has to be allocated.
@@ -584,8 +817,8 @@ int GetFirmwareVersion(){
 		case 0xbfba: return 3;
 		case 0xdfc7: return 4;
 		case 0x73b3: return 5;
-              case 0xe843: return 6;
-              case 0x0f1f: return 7;
+		case 0xe843: return 6;
+		case 0x0f1f: return 7;
 
 		case 0xf96d: return FW_iQue;
 		case 0x74f0: return FW_Korean;
@@ -597,5 +830,149 @@ int fexists(const char *path){
 	struct stat st;
 	if(stat(path,&st))return 0;
 	return (st.st_mode&S_IFDIR)?2:1;
+}
+
+void NotifyARM7(u32 c){IPCZ->cmd=c;}
+void CallARM7(u32 c){for(IPCZ->cmd=c;IPCZ->cmd;)swiWaitForVBlank();}
+
+int strchrindex(const char *s, const int c, const int idx){
+	const char *ret=strchr(s+idx,c);
+	if(!ret)return -1;
+	return ret-s;
+}
+
+int strstrindex(const char *s, const char *c, const int idx){
+	const char *ret=strstr(s+idx,c);
+	if(!ret)return -1;
+	return ret-s;
+}
+
+void changefileext(char *fn, const char *ext){
+	if(!fn||!ext||!*ext)return;
+	strcpy(getextname(fn),ext);
+}
+
+int GetRunningMode(){
+#if 0
+//ndef _LIBNDS_MAJOR_
+	return 0;
+#endif
+	//if(*(vu32*)0x023ffe2c==*(vu32*)0x027ffe2c)return 0;
+	if(!*(vu32*)0x4004000)return 0;
+	return 1;
+
+	//3DS?
+	//return 2;
+}
+
+bool readFrontend(char *target){
+	if(*argname){strcpy(target,argname);return true;}
+
+	FILE *f=fopen("/loadfile.dat","rb");
+	if(f){
+		int i=0;
+		myfgets((char*)libprism_buf,768,f);
+		fclose(f);
+		unlink("/loadfile.dat");
+		if(!memcmp((char*)libprism_buf,"//",2))i+=1;
+		if(!memcmp((char*)libprism_buf,"/./",3))i+=2; //menudo dir handling is buggy?
+		strcpy(target,(char*)libprism_buf+i);
+		return true;
+	}
+	f=fopen("/plgargs.dat","rb");
+	if(f){
+		//int i=0;
+		myfgets((char*)libprism_buf,768,f);
+		myfgets((char*)libprism_buf,768,f); //second line
+		fclose(f);
+		unlink("/plgargs.dat");
+		//if(!memcmp((char*)libprism_buf,"//",2))i+=1;
+		//if(!memcmp((char*)libprism_buf,"/./",3))i+=2;
+		strcpy(target,(char*)libprism_buf); //+i);
+		return true;
+	}
+	f=fopen("/moonshl2/extlink.dat","r+b");
+	if(f){
+		TExtLinkBody extlink;
+		memset(&extlink,0,sizeof(TExtLinkBody));
+		fread(&extlink,1,sizeof(TExtLinkBody),f);
+		if(extlink.ID!=ExtLinkBody_ID){fclose(f);return false;}
+		ucs2tombs(target,extlink.DataFullPathFilenameUnicode);
+		rewind(f);
+		fwrite("____",1,4,f);
+		fclose(f);
+		return true;
+	}
+	return false; //it is your choice to boot GUI or to halt.
+}
+
+bool writeFrontend(const int frontend_type, const char *exe, const char *target){ //kinda void...
+	if(frontend_type==FRONTEND_ARGV){
+		strcpy(argname,target);
+		fpassarg=true;
+		return true;
+	}
+	if(frontend_type==FRONTEND_LOADFILE){
+		FILE *f=fopen("/loadfile.dat","wb");
+		if(f){
+			char sfn[768];
+			getsfnlfn(target,sfn,NULL);
+			fputs(target,f);
+			fputs("\n",f);
+			fputs(sfn,f);
+			fputs("\n",f);
+			fclose(f);
+			return true;
+		}
+	}
+	if(frontend_type==FRONTEND_PLGARGS){
+		FILE *f=fopen("/plgargs.dat","wb");
+		if(f){
+			fputs(exe,f);
+			fputs("\n",f);
+			fputs(target,f);
+			fputs("\n",f);
+			fclose(f);
+			return true;
+		}
+	}
+	if(frontend_type==FRONTEND_EXTLINK){
+		FILE *f=fopen("/moonshl2/extlink.dat","wb");
+		if(f){
+			TExtLinkBody extlink;
+			memset(&extlink,0,sizeof(TExtLinkBody));
+			extlink.ID=ExtLinkBody_ID;
+			getsfnlfn(target,extlink.DataFullPathFilenameAlias,extlink.DataFullPathFilenameUnicode);
+			SplitItemFromFullPathAlias(extlink.DataFullPathFilenameAlias,extlink.DataPathAlias,extlink.DataFilenameAlias);
+			SplitItemFromFullPathUnicode(extlink.DataFullPathFilenameUnicode,extlink.DataPathUnicode,extlink.DataFilenameUnicode);
+
+			getsfnlfn(exe,extlink.NDSFullPathFilenameAlias,extlink.NDSFullPathFilenameUnicode);
+			SplitItemFromFullPathAlias(extlink.NDSFullPathFilenameAlias,extlink.NDSPathAlias,extlink.NDSFilenameAlias);
+			SplitItemFromFullPathUnicode(extlink.NDSFullPathFilenameUnicode,extlink.NDSPathUnicode,extlink.NDSFilenameUnicode);
+			fwrite(&extlink,1,sizeof(TExtLinkBody),f);
+			fclose(f);
+			return true;
+		}
+	}
+	return false;
+}
+
+void clearExtlink(){ //altloader should call this...
+	FILE *f=fopen("/moonshl2/extlink.dat","r+b"); //no truncate
+	if(f){
+		fwrite("____",1,4,f);
+		fclose(f);
+	}
+}
+
+int getExtlinkWrapperHBMode(){
+	return ini_getl("mshl2wrap","hbmode",0,"/moonshl2/extlink/mshl2wrap.ini");
+}
+
+void getExtlinkWrapperLoaderName(char *loader){
+	char dldiid[5];
+	memcpy(dldiid,DLDIDATA+ioType,4);
+	dldiid[4]=0;
+	ini_gets("mshl2wrap",dldiid,MOONSHELL,loader,256*3,"/moonshl2/extlink/mshl2wrap.ini");
 }
 

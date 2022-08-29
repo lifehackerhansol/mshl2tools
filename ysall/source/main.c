@@ -3,7 +3,7 @@ const u16 bgcolor=RGB15(4,0,12);
 
 char dldiid[5];
 void patchys(u8* buf){
-	_consolePrintf("Patching YSMenu... ");
+	_consolePrint("Patching YSMenu... ");
 	char *arm9=(char*)buf+512;
 	arm9[0x220e7]=0xea; //yspatch
 	arm9[0x375c9]=0xd3; //fatpatch
@@ -46,7 +46,6 @@ void Main(){
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"; //744 paddings
 
-	IPCZ->cmd=0;
 	ret_menu9_callback=patchys;
 	_consolePrintf(
 		"YSMenu for all flashcart\n"
@@ -64,28 +63,28 @@ void Main(){
 		_consolePrintf("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
 	}
 
-	//_consolePrintf("Waiting... ");
+	//_consolePrint("Waiting... ");
 	//sleep(1);
-	//_consolePrintf("Done.\n");
+	//_consolePrint("Done.\n");
 
-	_consolePrintf("Initializing libfat... ");
-	if(!fatInitDefault()){_consolePrintf("Failed.\n");die();}
-	_consolePrintf("Done.\n");
+	_consolePrint("Initializing FAT... ");
+	if(!disc_mount()){_consolePrint("Failed.\n");die();}
+	_consolePrint("Done.\n");
 
-	_consolePrintf("Patching /YSMenu/exlinker.nds... ");
+	_consolePrint("Patching /YSMenu/exlinker.nds... ");
 	{
 		FILE *f=fopen("/YSMenu/exlinker.nds","r+b");
-		if(!f){_consolePrintf("cannot open.\n");die();}
+		if(!f){_consolePrint("cannot open.\n");die();}
 		struct stat st;
 		fstat(fileno(f),&st);
-		if(st.st_size>1536*1024){_consolePrintf("size limit 1.5MB exceeded.\n");die();}
+		if(st.st_size>1536*1024){_consolePrint("size limit 1.5MB exceeded.\n");die();}
 		fread((u8*)0x02000000+2*1024*1024,1,st.st_size,f);
 		rewind(f);
 		dldi((u8*)0x02000000+2*1024*1024,st.st_size);
 		fwrite((u8*)0x02000000+2*1024*1024,1,st.st_size,f);
 		fclose(f);
 	}
-	_consolePrintf("Done.\n");
+	_consolePrint("Done.\n");
 
 	ini_gets("Config","YSMenu",file,file,768,"/MOONSHL2/EXTLINK/inilink.ini");
 

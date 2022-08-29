@@ -16,19 +16,16 @@ void getfilelist(char *dir,int filter){
 	fileinfo *p=&ftop;
 	struct stat st;
 	contentcount=0;
-	DIR_ITER *dp=diropen(dir);
-	if(!dp)return;
-	u8 *direntry;
-	int attr=0;
-	((direntry=getDirEntFromDirIter(dp))&&(attr=direntry[0xb]));
-	for(;!dirnext(dp,getfilelist_tmp,&st); ((direntry=getDirEntFromDirIter(dp))&&(attr=direntry[0xb])) ){
+	DIR_ITER *dp=mydiropen(dir);
+	if(!dp){_consoleClear();_consolePrintf("cannot diropen %s\n",dir);die();}//return;
+	for(;!mydirnext(dp,getfilelist_tmp,&st);){
 		if(!strcmp(getfilelist_tmp,"."))continue;
 		if(p->next==NULL){p->next=(fileinfo*)malloc(sizeof(fileinfo)),memset(p->next,0,sizeof(fileinfo));}
 		if(!p->next){_consoleClear();_consolePrintf("cannot alloc memory. halt. contentcount==%d\n",contentcount);die();}
 		if(hidehidden){
-			if(attr&ATTRIB_HID||attr&ATTRIB_SYS)continue;
+			if(st.st_spare1&ATTRIB_HID||st.st_spare1&ATTRIB_SYS){/*_consolePrintf2("%s st_mode %02x\n",getfilelist_tmp,st.st_spare1);*/continue;}
 		}
-		if(st.st_mode & S_IFDIR){
+		if(st.st_spare1 & ATTRIB_DIR){
 			p=p->next;
 			p->isDir=1,strcat(getfilelist_tmp,"/");
 			strcpy(p->name,getfilelist_tmp);
@@ -51,9 +48,9 @@ ok:
 		}
 		contentcount++;
 	}
-	dirclose(dp);
+	mydirclose(dp);
 	if(contentcount<2)return;
-	if(contentcount>4096)_consolePrintf2("contentcount>4096. sort skipped.\n");
+	if(contentcount>4096)_consolePrint2("contentcount>4096. sort skipped.\n");
 	{
 		fileinfo *fI;
 		int i,j;
@@ -107,94 +104,64 @@ void runCommercial(char *file,char *loader){
 	u8 head[0x200];
 	int size;
 	FILE *f;
-	TExtLinkBody extlink;
 
-	memset(&extlink,0,sizeof(TExtLinkBody));
 	if(!(f=fopen(file,"rb"))){_consolePrintf("cannot open %s\n",file);die();}
 	{struct stat st;fstat(fileno(f),&st);size=st.st_size;}
 	if(size<0x200){fclose(f);_consolePrintf("too short %s\n",file);die();}
 	fread(head,1,0x200,f);
 	if(!isHomebrew(head)){
-		strcpy(target,file);goto target_set;
+		strcpy(target,file);fclose(f);goto target_set;
 	}else if(!strcmp((char*)head+0x1e0,"mshl2wrap link")){
 		unsigned int s=(head[0x1f0]<<24)+(head[0x1f1]<<16)+(head[0x1f2]<<8)+head[0x1f3];
-		_consolePrintf("Detected mshl2wrap link.\n");
+		_consolePrint("Detected mshl2wrap link.\n");
 		if(size<s+256*3){fclose(f);_consolePrintf("mshl2wrap link broken %s\n",file);die();}
-		fseek(f,s,SEEK_SET);fread(target,1,256*3,f);goto target_set;
+		fseek(f,s,SEEK_SET);fread(target,1,256*3,f);fclose(f);goto target_set;
 	}
+	fclose(f);
 	return; //not commercial.
       	target_set:
-	_consolePrintf("Configuring extlink...\n");
-	extlink.ID=ExtLinkBody_ID;
-	getsfnlfn(target,extlink.DataFullPathFilenameAlias,extlink.DataFullPathFilenameUnicode);
-	SplitItemFromFullPathAlias(extlink.DataFullPathFilenameAlias,extlink.DataPathAlias,extlink.DataFilenameAlias);
-	SplitItemFromFullPathUnicode(extlink.DataFullPathFilenameUnicode,extlink.DataPathUnicode,extlink.DataFilenameUnicode);
+	_consolePrint("Configuring extlink... ");
+	if(!writeFrontend(FRONTEND_EXTLINK,loader,target)){_consolePrint("Failed.\n");die();}
+	_consolePrint("Done.\n");
 
-	getsfnlfn(loader,extlink.NDSFullPathFilenameAlias,extlink.NDSFullPathFilenameUnicode);
-	SplitItemFromFullPathAlias(extlink.NDSFullPathFilenameAlias,extlink.NDSPathAlias,extlink.NDSFilenameAlias);
-	SplitItemFromFullPathUnicode(extlink.NDSFullPathFilenameUnicode,extlink.NDSPathUnicode,extlink.NDSFilenameUnicode);
-
-	_consolePrintf("Target NDS is:\n%s\n",extlink.DataFullPathFilenameAlias);
-	_consolePrintf("Loader name is:\n%s\n",extlink.NDSFullPathFilenameAlias);
-
-	fclose(f);
-	if(!(f=fopen("/MOONSHL2/EXTLINK.DAT","wb"))){_consolePrintf("cannot open extlink.dat\n");die();}
-	fwrite(&extlink,1,sizeof(TExtLinkBody),f);
-	fclose(f);
-	_consolePrintf("Rebooting...\n");
+	_consolePrint("Rebooting...\n");
 	BootLibrary(loader);
 	die();
 }
 
 bool runTextEdit(char *file){
 	FILE *f;
-	TExtLinkBody extlink;
+	//TExtLinkBody extlink;
 	char *loader="/moonshl2/extlink/_te.TextEdit.nds";
 
-	extlink.ID=ExtLinkBody_ID;
-	getsfnlfn(file,extlink.DataFullPathFilenameAlias,extlink.DataFullPathFilenameUnicode);
-	SplitItemFromFullPathAlias(extlink.DataFullPathFilenameAlias,extlink.DataPathAlias,extlink.DataFilenameAlias);
-	SplitItemFromFullPathUnicode(extlink.DataFullPathFilenameUnicode,extlink.DataPathUnicode,extlink.DataFilenameUnicode);
+	_consolePrint("Configuring extlink... ");
+	if(!writeFrontend(FRONTEND_EXTLINK,loader,file)){_consolePrint("Failed.\n");die();}
+	_consolePrint("Done.\n");
 
-	getsfnlfn(loader,extlink.NDSFullPathFilenameAlias,extlink.NDSFullPathFilenameUnicode);
-	SplitItemFromFullPathAlias(extlink.NDSFullPathFilenameAlias,extlink.NDSPathAlias,extlink.NDSFilenameAlias);
-	SplitItemFromFullPathUnicode(extlink.NDSFullPathFilenameUnicode,extlink.NDSPathUnicode,extlink.NDSFilenameUnicode);
-
-	if(!(f=fopen("/MOONSHL2/EXTLINK.DAT","wb"))){_consolePrintf("cannot open extlink.dat\n");return false;}
-	fwrite(&extlink,1,sizeof(TExtLinkBody),f);
-	fclose(f);
-	_consolePrintf("Rebooting...\n");
+	_consolePrint("Rebooting...\n");
 	return BootLibrary(loader);
 }
 
 bool runExtLink(char *file,char *ext){
 	FILE *f;
-	TExtLinkBody extlink;
+	//TExtLinkBody extlink;
 	char loader[768];
 	strcpy(loader,"/moonshl2/extlink/");
 	char *name=loader+strlen(loader);
 
-	DIR_ITER *dp=diropen("/moonshl2/extlink/");
+	DIR_ITER *dp=mydiropen("/moonshl2/extlink/");
 	if(!dp)return false;
-	for(;!dirnext(dp,name,NULL);){
-		if(!strcasecmp(getextname(name),".nds")&&!memcmp(ext+1,name,strlen(ext+1))&&name[strlen(ext+1)]=='.'){dirclose(dp);goto exec;}
+	for(;!mydirnext(dp,name,NULL);){
+		if(!strcasecmp(getextname(name),".nds")&&!memcmp(ext+1,name,strlen(ext+1))&&name[strlen(ext+1)]=='.'){mydirclose(dp);goto exec;}
 	}
-	dirclose(dp);
-	_consolePrintf("Cannot find extlink. Very weird.\n");return false;
+	mydirclose(dp);
+	_consolePrint("Cannot find extlink. Very weird.\n");return false;
 exec:
-	extlink.ID=ExtLinkBody_ID;
-	getsfnlfn(file,extlink.DataFullPathFilenameAlias,extlink.DataFullPathFilenameUnicode);
-	SplitItemFromFullPathAlias(extlink.DataFullPathFilenameAlias,extlink.DataPathAlias,extlink.DataFilenameAlias);
-	SplitItemFromFullPathUnicode(extlink.DataFullPathFilenameUnicode,extlink.DataPathUnicode,extlink.DataFilenameUnicode);
+	_consolePrint("Configuring extlink... ");
+	if(!writeFrontend(FRONTEND_EXTLINK,loader,file)){_consolePrint("Failed.\n");die();}
+	_consolePrint("Done.\n");
 
-	getsfnlfn(loader,extlink.NDSFullPathFilenameAlias,extlink.NDSFullPathFilenameUnicode);
-	SplitItemFromFullPathAlias(extlink.NDSFullPathFilenameAlias,extlink.NDSPathAlias,extlink.NDSFilenameAlias);
-	SplitItemFromFullPathUnicode(extlink.NDSFullPathFilenameUnicode,extlink.NDSPathUnicode,extlink.NDSFilenameUnicode);
-
-	if(!(f=fopen("/MOONSHL2/EXTLINK.DAT","wb"))){_consolePrintf("cannot open extlink.dat\n");return false;}
-	fwrite(&extlink,1,sizeof(TExtLinkBody),f);
-	fclose(f);
-	_consolePrintf("Rebooting...\n");
+	_consolePrint("Rebooting...\n");
 	return BootLibrary(loader);
 }
 
@@ -208,9 +175,9 @@ int iterateExtLink(int start){
 	char name[768];
 	strcpy(name,"/moonshl2/extlink/");
 	char *fname=name+strlen(name);
-	DIR_ITER *dp=diropen(name);
+	DIR_ITER *dp=mydiropen(name);
 	if(!dp)return start;
-	for(;!dirnext(dp,fname,NULL);){
+	for(;!mydirnext(dp,fname,NULL);){
 		if(!strcasecmp(getextname(fname),".nds")){
 			char* x=fname;
 			for(;*x!='.';x++);
@@ -224,7 +191,7 @@ int iterateExtLink(int start){
 			}
 		}
 	}
-	dirclose(dp);
+	mydirclose(dp);
 	return start;
 }
 
@@ -237,9 +204,9 @@ int iterateMSP(int start){
 	strcpy(name,"/moonshl/plugin/");
 	char *fname=name+strlen(name);
 	memset(reg_msp,0,sizeof(reg_msp));
-	DIR_ITER *dp=diropen("/moonshl/plugin/");
+	DIR_ITER *dp=mydiropen("/moonshl/plugin/");
 	if(!dp)return start;
-	for(;!dirnext(dp,fname,NULL);){
+	for(;!mydirnext(dp,fname,NULL);){
 		if(!strcasecmp(getextname(fname),".msp")){
 			//check file content
 			TPluginHeader PH;
@@ -264,7 +231,7 @@ int iterateMSP(int start){
 			_consolePrintf("Regist MSP: %s\n",name);
 		}
 	}
-	dirclose(dp);
+	mydirclose(dp);
 	return start;
 }
 
@@ -273,11 +240,11 @@ TPluginBody* getPluginByIndex(int idx){
 	//sprintf(name,"/moonshl/plugin/%s",reg_msp[idx]);
 	//return DLLList_LoadPlugin(name);
 	return DLLList_LoadPlugin(reg_msp[idx]);
-}	
+}
 
 //pref
 u8 dldibuf[32768];
-int selectpref(char *title,int argc, char **argv){
+int selectpref(char *title,int argc, char *argv[]){
 	int cursor=0,key,keycount=0,keycountmax=KEYCOUNTMAX_UNREPEATED;
 	for(;;){
 		swiWaitForVBlank();
@@ -286,7 +253,7 @@ int selectpref(char *title,int argc, char **argv){
 		_consolePrintf2("%s\n------------------------------------------",title);
 		for(;i<argc;i++){
 			_consolePrint2(i==cursor?"\n*":"\n ");
-			_consolePrintf2(argv[i]);
+			_consolePrint2(argv[i]);
 		}
 		for(;;swiWaitForVBlank()){
 			if(!IPCZ->keysheld)continue;
@@ -345,7 +312,7 @@ void *bitmap_create(int width, int height, unsigned int state){return calloc(wid
 void bitmap_set_suspendable(void *bitmap, void *private_word,
 			     void (*invalidate)(void *bitmap, void *private_word)){}
 
-void invalidate(void *bitmap, void *private_word){}
+//void invalidate(void *bitmap, void *private_word){}
 
 unsigned char *bitmap_get_buffer(void *bitmap){return bitmap;}
 

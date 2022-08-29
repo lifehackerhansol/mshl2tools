@@ -51,6 +51,7 @@ extern const byte *io_dldi_data;
 #endif
 
 extern byte *DLDIToBoot;
+extern const byte DLDINull[];
 
 int dldi2(byte *nds,const int ndslen,const int bypassYSMenu,const char *dumpname);
 int dldi(byte *nds,const int ndslen);

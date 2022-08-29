@@ -67,6 +67,7 @@ if(nds){
 	if(pD!=DLDIDATA)goto done;
 
 if(bypassYSMenu){
+#if 0 //make sure you use AKAIO 1.8.5 or later DLDI.
 	if(!memcmp(id,"RPGS",4)&&!memcmp(pD+friendlyName,"Acekard AK2",11)){
 		pD=NULL;
 		printf(
@@ -84,6 +85,7 @@ if(bypassYSMenu){
 akaiofail:
 		free(pD);printf("I cannot do anything. I have to run away!\n\nNobody knows where he is now...\n");die();
 	}
+#endif
 	if(!memcmp(pD+ioType,"DEMO",4))memcpy(pD+ioType,"TTIO",4);
 	if(!memcmp(pD+ioType,"R4DS",4))memcpy(pD+ioType,"RPGS",4);
 }

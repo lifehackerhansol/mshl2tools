@@ -10,30 +10,51 @@
 	ToDo: refactoring
 */
 
-s32 max;
-char *title;
+static s32 max;
+static char *title;
+static TPluginBody *pCurrentPluginBody;
 
-void MWin_ProgressShow(char *TitleStr,s32 _Max){title=TitleStr,max=_Max;}
-void MWin_ProgressSetPos(s32 _Position){_consolePrintf2("%s %d%%\r",title,_Position*100/max);}
-void MWin_ProgressHide(void){_consolePrintf2("Open Success.            \n");}
+static void MWin_ProgressShow(char *TitleStr,s32 _Max){title=TitleStr,max=_Max;_consoleStartProgress2();}
+static void MWin_ProgressSetPos(s32 _Position){_consolePrintProgress2(title,_Position,max);} //("%s %d%%\r",title,_Position*100/max);}
+static void MWin_ProgressHide(void){_consoleEndProgress2();_consolePrint2("Open Success.            \n");}
 
-int Plugin_msp_fopen(const char *fn){return 0;}
-bool Plugin_msp_fclose(int fh){return false;}
-char *Plugin_GetINIData(void){return NULL;}
-int Plugin_GetINISize(void){return 0;}
-void *Plugin_GetBINData(void){return NULL;}
-int Plugin_GetBINSize(void){return 0;}
-int Plugin_GetBINFileHandle(void){return 0;}
+static int Plugin_msp_fopen(const char *fn){return fopen(fn,"rb");}
+static bool Plugin_msp_fclose(int fh){fclose(fh);return true;}
+static char *Plugin_GetINIData(){
+	TPluginBody *pPB=pCurrentPluginBody;
+	return pPB->INIData;
+}
+static int Plugin_GetINISize(){
+	TPluginBody *pPB=pCurrentPluginBody;
+	return pPB->INISize;
+}
+static void *Plugin_GetBINData(){
+	TPluginBody *pPB=pCurrentPluginBody;
+	if(!pPB->BINFileHandle||!pPB->BINSize)return NULL;
 
-void extmem_SetCount(u32 Count){}
-bool extmem_Exists(u32 SlotIndex){return false;}
-bool extmem_Alloc(u32 SlotIndex,u32 Size){return false;}
-bool extmem_Write(u32 SlotIndex,void *pData,u32 DataSize){return false;}
-bool extmem_Read(u32 SlotIndex,void *pData,u32 DataSize){return false;}
-u32 formdt_FormatDate(char *str, u32 size, const u32 year, const u32 month, const u32 day){return 0;}
+	if(pPB->BINData==NULL){
+		pPB->BINData=safemalloc(pPB->BINSize);
+		if(pPB->BINData!=NULL){
+			fread(pPB->BINData,1,pPB->BINSize,pPB->BINFileHandle);
+		}
+	}
+	return pPB->BINData;
+}
+static int Plugin_GetBINSize(){
+	TPluginBody *pPB=pCurrentPluginBody;
+	return(pPB->BINSize);
+}
+static int Plugin_GetBINFileHandle(){
+	TPluginBody *pPB=pCurrentPluginBody;
+	if(!pPB->BINFileHandle||!pPB->BINSize)return 0;
+	return pPB->BINFileHandle;
+}
 
-static inline const TPlugin_StdLib *Plugin_GetStdLib(void)
-{
+static u32 formdt_FormatDate(char *str, u32 size, const u32 year, const u32 month, const u32 day){*str=0;return 0;}
+
+static void _consolePrintSet2(int x, int y){}//_consoleClear2();}
+
+static inline const TPlugin_StdLib *Plugin_GetStdLib(){
   static TPlugin_StdLib sPlugin_StdLib={
     _consolePrint2,_consolePrintf2,
     _consolePrintSet2,
@@ -69,8 +90,8 @@ static inline const TPlugin_StdLib *Plugin_GetStdLib(void)
   return(&sPlugin_StdLib);
 }
 
-bool DLL_LoadLibrary(TPluginBody *pPB,const TPlugin_StdLib *pStdLib,void *pbin,int binsize)
-{
+bool DLL_LoadLibrary(TPluginBody *pPB,const TPlugin_StdLib *pStdLib,void *pbin,int binsize){
+  pCurrentPluginBody=NULL;
   memset(pPB,0,sizeof(TPluginBody));
   
   TPluginHeader *pPH=&pPB->PluginHeader;
@@ -300,7 +321,7 @@ bool DLL_LoadLibrary(TPluginBody *pPB,const TPlugin_StdLib *pStdLib,void *pbin,i
 #ifdef ShowPluginInfo
   _consolePrint2("LoadLibrary:Initialized.\n");
 #endif
-  
+
   return(true);
 }
 
@@ -330,15 +351,15 @@ TPluginBody* DLLList_LoadPlugin(char *fn)
 {
   void *buf;
   int size;
+  pCurrentPluginBody=NULL;
 
 	FILE *f=fopen(fn,"rb");
+	if(!f)return NULL;
 	size=filelength(fileno(f));
 	buf=malloc(size);
 	fread(buf,1,size,f);
 	fclose(f);
-  
-  //Shell_ReadMSP(fn,&buf,&size);
-  
+
   if((buf==NULL)||(size==0)){
     _consolePrintf2("%s file read error.\n",fn);
     return(NULL);
@@ -350,46 +371,45 @@ TPluginBody* DLLList_LoadPlugin(char *fn)
     _consolePrint2("Memory overflow.\n");
     return(NULL);
   }
-  
+  extmem_Init();
   if(DLL_LoadLibrary(pPB,Plugin_GetStdLib(),buf,size)==false){
     free(pPB); pPB=NULL;
+    extmem_Free();
     return(NULL);
   }
-  
+
   pPB->INIData=NULL;
   pPB->INISize=0;
   pPB->BINFileHandle=0;
   pPB->BINData=NULL;
   pPB->BINSize=0;
-/*
-  Shell_ReadMSPINI(fn,(char**)&pPB->INIData,&pPB->INISize);
-#ifdef ShowPluginInfo
-  _consolePrintf2("LoadINI 0x%x(%d)\n",(u32)pPB->INIData,pPB->INISize);
-#endif
-  
-  pPB->BINFileHandle=Shell_OpenMSPBIN(fn);
-  if(pPB->BINFileHandle==0){
-    pPB->BINData=NULL;
-    pPB->BINSize=0;
-    }else{
-    pPB->BINData=NULL;
-    FileSys_fseek(pPB->BINFileHandle,0,SEEK_END);
-    pPB->BINSize=FileSys_ftell(pPB->BINFileHandle);
-    FileSys_fseek(pPB->BINFileHandle,0,SEEK_SET);
-  }
-#ifdef ShowPluginInfo
-  _consolePrintf2("LoadBIN FileHandle=%d size=%d\n",pPB->BINFileHandle,pPB->BINSize);
-#endif
-*/
 
-  //pCurrentPluginBody=pPB;
+	changefileext(fn,".ini");
+	f=fopen(fn,"rb");
+	if(f){
+		pPB->INISize=filelength(fileno(f));
+		pPB->INIData=malloc(pPB->INISize);
+		fread(pPB->INIData,1,pPB->INISize,f);
+		fclose(f);
+	}
+
+	changefileext(fn,".bin");
+	f=fopen(fn,"rb");
+	if(f){
+		pPB->BINFileHandle=(int)f;
+		pPB->BINSize=filelength(fileno(f));
+	}
+
+	changefileext(fn,".msp");
+
+  pCurrentPluginBody=pPB;
   
   return(pPB);
 }
 
 void DLLList_FreePlugin(TPluginBody *pPB)
 {
-  //pCurrentPluginBody=NULL;
+  pCurrentPluginBody=NULL;
   
   if(pPB==NULL) return;
   
@@ -399,14 +419,14 @@ void DLLList_FreePlugin(TPluginBody *pPB)
   if(pPB->pSE!=NULL) pPB->pSE->Free();
   
   DLL_FreeLibrary(pPB,true);
-/*
+
   if(pPB->INIData!=NULL){
     free(pPB->INIData); pPB->INIData=NULL;
     pPB->INISize=0;
   }
   
   if(pPB->BINFileHandle!=0){
-    FileSys_fclose(pPB->BINFileHandle);
+    fclose(pPB->BINFileHandle);
     pPB->BINFileHandle=0;
   }
   
@@ -414,6 +434,7 @@ void DLLList_FreePlugin(TPluginBody *pPB)
     free(pPB->BINData); pPB->BINData=NULL;
     pPB->BINSize=0;
   }
-*/
-free(pPB);
+
+  free(pPB);
+  extmem_Free();
 }

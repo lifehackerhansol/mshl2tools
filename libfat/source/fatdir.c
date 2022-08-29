@@ -32,7 +32,8 @@
 #include <errno.h>
 #include <ctype.h>
 #include <unistd.h>
-#include <sys/dir.h>
+//#include <sys/dir.h>
+#include <sys/iosupport.h>
 
 #include "fatdir.h"
 
@@ -451,7 +452,7 @@ int _FAT_mkdir_r (struct _reent *r, const char *path, int mode) {
 	return 0;
 }
 
-int _FAT_statvfs_r (struct _reent *r, const char *path, struct statvfs *buf) 
+int _FAT_statvfs_r (struct _reent *r, const char *path, struct statvfs *buf)
 {
 	PARTITION* partition = NULL;
 	unsigned int freeClusterCount;
@@ -465,29 +466,38 @@ int _FAT_statvfs_r (struct _reent *r, const char *path, struct statvfs *buf)
 
 	_FAT_lock(&partition->lock);
 
-	freeClusterCount = _FAT_fat_freeClusterCount (partition);
-	
+    if(memcmp(&buf->f_flag, "SCAN", 4) == 0)
+    {
+        //Special command was given to sync the numberFreeCluster
+        _FAT_partition_createFSinfo(partition);
+    }
+
+    if(partition->filesysType == FS_FAT32)
+        freeClusterCount = partition->fat.numberFreeCluster;
+    else
+        freeClusterCount = _FAT_fat_freeClusterCount (partition);
+
 	// FAT clusters = POSIX blocks
-	buf->f_bsize = partition->bytesPerCluster;		// File system block size. 
-	buf->f_frsize = partition->bytesPerCluster;	// Fundamental file system block size. 
-	
-	buf->f_blocks	= partition->fat.lastCluster - CLUSTER_FIRST + 1; // Total number of blocks on file system in units of f_frsize. 
-	buf->f_bfree = freeClusterCount;	// Total number of free blocks. 
-	buf->f_bavail	= freeClusterCount;	// Number of free blocks available to non-privileged process. 
+	buf->f_bsize = partition->bytesPerCluster;		// File system block size.
+	buf->f_frsize = partition->bytesPerCluster;	// Fundamental file system block size.
+
+	buf->f_blocks	= partition->fat.lastCluster - CLUSTER_FIRST + 1; // Total number of blocks on file system in units of f_frsize.
+	buf->f_bfree = freeClusterCount;	// Total number of free blocks.
+	buf->f_bavail	= freeClusterCount;	// Number of free blocks available to non-privileged process.
 
 	// Treat requests for info on inodes as clusters
-	buf->f_files = partition->fat.lastCluster - CLUSTER_FIRST + 1;	// Total number of file serial numbers. 
-	buf->f_ffree = freeClusterCount;	// Total number of free file serial numbers. 
-	buf->f_favail = freeClusterCount;	// Number of file serial numbers available to non-privileged process. 
-	
+	buf->f_files = partition->fat.lastCluster - CLUSTER_FIRST + 1;	// Total number of file serial numbers.
+	buf->f_ffree = freeClusterCount;	// Total number of free file serial numbers.
+	buf->f_favail = freeClusterCount;	// Number of file serial numbers available to non-privileged process.
+
 	// File system ID. 32bit ioType value
-	buf->f_fsid = _FAT_disc_hostType(partition->disc); 
-	
+	buf->f_fsid = _FAT_disc_hostType(partition->disc);
+
 	// Bit mask of f_flag values.
 	buf->f_flag = ST_NOSUID /* No support for ST_ISUID and ST_ISGID file mode bits */
 		| (partition->readOnly ? ST_RDONLY /* Read only file system */ : 0 ) ;
 	// Maximum filename length.
-	buf->f_namemax = MAX_FILENAME_LENGTH;	 
+	buf->f_namemax = MAX_FILENAME_LENGTH;
 
 	_FAT_unlock(&partition->lock);
 	return 0;

@@ -13,7 +13,7 @@ typedef unsigned char data_t;
 
 extern const unsigned char ndshead[512];
 
-static char bootlibname[256*3]="/boot.bin\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0" //will be modified externally
+char bootlibname[256*3]="/boot.bin\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0" //will be modified externally
 			"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 			"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 			"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
@@ -39,12 +39,43 @@ static char bootlibname[256*3]="/boot.bin\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 			"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 			"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 			"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"; //752 paddings
+
+//#ifdef _LIBNDS_MAJOR_
+char bootstubname[256*3]="/bootstub.bin\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0" //will be modified externally
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"; //748 paddings
+//#endif
+
 bool bootlibAvailable(){return !access(bootlibname,0);}
+bool bootstubAvailable(){return !access(bootstubname,0);}
 
 const data_t dldiMagicLoaderString[] = "\xEE\xA5\x8D\xBF Chishm";	// Different to a normal DLDI file
 
 #define torelative(n) (readAddr(pA+n)-pAdata)
-inline int dldiloader(byte *nds,const int ndslen){
+int dldiloader(byte *nds,const int ndslen){
 	byte *pD=DLDIToBoot!=NULL?DLDIToBoot:DLDIDATA;
 	int dldilen;
 
@@ -106,44 +137,15 @@ inline int dldiloader(byte *nds,const int ndslen){
 
 void runNds(const char* filename, u32 cluster/*, bool initDisc, bool dldiPatchNds*//*, bool useDSBooter*/)
 {
+	u8 *bootstub=(u8*)0x02ff4000;
 	FILE *f;
-	struct stat st;
-#ifdef _LIBNDS_MAJOR_
-	struct stat st2;
-	char stub[256*3]="/bootstub.bin\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0" //will be modified externally
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-				"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"; //748 paddings
-#endif
-
-	_consolePrintf("Preparing...\n");
+	struct stat st,st2;
+	_consolePrint("Preparing...\n");
 	
 	// Load the loader/patcher into the correct address
 	//vramcpy (VRAM_C, loader, loaderSize);
 	f=fopen(bootlibname,"rb");
-	if(!f){_consolePrintf("Cannot open bootlib. Halt.\n");while(1);}
+	if(!f){_consolePrint("Cannot open bootlib. Halt.\n");while(1);}
 	fstat(fileno(f),&st);
 
 	//using _consolePrintf2() from here is strictly prohibited.
@@ -156,22 +158,22 @@ void runNds(const char* filename, u32 cluster/*, bool initDisc, bool dldiPatchNd
 	fclose(f);
 	dldiloader((data_t*)VRAM_C, st.st_size); //loaderSize);
 
-#ifdef _LIBNDS_MAJOR_
-	_consolePrintf("Installing bootstub...\n");
-	f=fopen(stub,"rb");
+// #ifdef _LIBNDS_MAJOR_ //r23 modified crt0 removes this limitation.
+	_consolePrint("Installing bootstub...\n");
+	f=fopen(bootstubname,"rb");
 	if(f){
-		extern u8 *fake_heap_end;
 		fstat(fileno(f),&st2);
-		fread(fake_heap_end,1,st2.st_size,f);
+		fread(bootstub,1,st2.st_size,f);
 		fclose(f);
-		memcpy(fake_heap_end+st2.st_size,VRAM_C,st.st_size);
-		writeAddr(fake_heap_end+0x08,readAddr(fake_heap_end+0x08)+(u32)fake_heap_end);
-		writeAddr(fake_heap_end+0x0c,readAddr(fake_heap_end+0x0c)+(u32)fake_heap_end);
-		writeAddr(fake_heap_end+0x10,st.st_size);
+		memcpy(bootstub+st2.st_size,VRAM_C,st.st_size);
+		writeAddr(bootstub+0x08,readAddr(bootstub+0x08)+(u32)bootstub);
+		writeAddr(bootstub+0x0c,readAddr(bootstub+0x0c)+(u32)bootstub);
+		writeAddr(bootstub+0x10,st.st_size);
 	}
-#else
-	_consolePrintf("devkitARM r23b w/o bootstub support.\n");
-#endif
+// #else
+//	_consolePrint("devkitARM r23b w/o bootstub support.\n");
+// #endif
+	disc_unmount();
 
 	// Set the parameters for the loader
 	// STORED_FILE_CLUSTER = cluster;
@@ -181,12 +183,19 @@ void runNds(const char* filename, u32 cluster/*, bool initDisc, bool dldiPatchNd
 	// WANT_TO_PATCH_DLDI = dldiPatchNds;
 	writeAddr((data_t*)VRAM_C+0x0c, DLDIToBoot!=NULL);//dldiPatchNds);
 
+if(*(vu16*)VRAM_C>=5){ //bootlib v2 with ARGV
 	//set argv
 	u32 arg=align4( (u32)VRAM_C+readAddr((data_t*)VRAM_C+0x10) );
 	vramcpy((u16*)arg,"fat:",2);
 	vramcpy(((u16*)arg)+2,filename,align2(strlen(filename))/2);
 	writeAddr((data_t*)VRAM_C+0x10, arg-(u32)VRAM_C);
 	writeAddr((data_t*)VRAM_C+0x14, strlen(filename)+5);
+	//if(fpassarg){}
+}
+
+if(*(vu16*)VRAM_C>=6){ //bootlib v3 with DSi SD
+	writeAddr((data_t*)VRAM_C+0x1c, 0); // sorry but sd:/ not supported currently.
+}
 
 /*
 	if(useDSBooter){
@@ -194,7 +203,7 @@ void runNds(const char* filename, u32 cluster/*, bool initDisc, bool dldiPatchNd
 		for(;i<st.st_size;i+=4)
 			if(readAddr((data_t*)VRAM_C+i)==0x54425344)break;
 		if(i>=st.st_size)
-			{_consolePrintf("This boot.bin doesn't support DSBooter extention. Halt.\n");while(1);}
+			{_consolePrint("This boot.bin doesn't support DSBooter extention. Halt.\n");while(1);}
 		writeAddr((data_t*)VRAM_C+i+4, 1);
 		//if(!readAddr((data_t*)VRAM_C+0x18))writeAddr((data_t*)VRAM_C+0x18,useDSBooter);
 		vramcpy((data_t*)VRAM_C+i+8,ndshead,0x170);
@@ -206,20 +215,34 @@ void runNds(const char* filename, u32 cluster/*, bool initDisc, bool dldiPatchNd
 	}
 	}
 */
-	IPCZ->cmd=ResetBootlib;
+	//(*(type_void*)(bootstub+0x08))();
+#ifndef _LIBNDS_MAJOR_
+	NotifyARM7(ResetBootlib);
+#endif
+	irqDisable(IRQ_ALL);
+#ifndef _LIBNDS_MAJOR_
+	IC_InvalidateAll();
 	DC_FlushAll();
+	DC_InvalidateAll();
+#endif
 
 	// Give the VRAM to the ARM7
 	VRAM_C_CR = VRAM_ENABLE | VRAM_C_ARM7_0x06000000;
 
 	// Reset into a passme loop
 	REG_EXMEMCNT |= ARM7_OWNS_ROM | ARM7_OWNS_CARD;
-	_consolePrintf("Go!!!\n");
-	*((vu32*)0x027FFFFC) = 0;
-	*((vu32*)0x027FFE04) = (u32)0xE59FF018;
-	*((vu32*)0x027FFE24) = (u32)0x027FFE04;
+	_consolePrint("Go!!!\n");
+	//*((vu32*)0x02fFFFFC) = 0;
+	//*((vu32*)0x02fFFE04) = (u32)0xE59FF018;
+	//*((vu32*)0x02fFFE24) = (u32)0x02fFFE04;
+	*memUncachedAddr(0x02fFFFFC)=0;
+	*memUncachedAddr(0x02fFFE04)=0xE59FF018;
+	*memUncachedAddr(0x02fFFE24)=(u32)memUncachedAddr(0x02fFFE04);
+#ifdef _LIBNDS_MAJOR_
+	resetARM7(0x06000000);
+#endif
 	swiSoftReset();
-	_consolePrintf("Failed.\n");while(1);
+	_consolePrint("Failed.\n");while(1);
 }
 
 bool runNdsFile(const char* filename){
@@ -228,7 +251,7 @@ bool runNdsFile(const char* filename){
 		_consolePrintf("Cannot stat %s\n",filename);return false;
 	}
 	if(!bootlibAvailable()){
-		_consolePrintf("bootlib isn't available\n");return false;
+		_consolePrint("bootlib isn't available\n");return false;
 	}
 	runNds(filename,st.st_ino);//, true, true);//, false);
 	return true;
@@ -249,7 +272,7 @@ bool runDSBooter (const char* filename){
 	fstat(fileno(f),&st);
 	fread(head,1,512,f);
 	fclose(f);
-	_consolePrintf("Decrypting... ");
+	_consolePrint("Decrypting... ");
 	{
 		int i=0,j;
 		for(;i<0x100;i++){
@@ -258,7 +281,7 @@ bool runDSBooter (const char* filename){
 			if(!memcmp(dec+0xa0,"DSBooter",8))
 				{_consolePrintf("key = 0x%02x\n",i);break;}
 		}
-		if(i==0x100){_consolePrintf("Cannot decode or not DSBooter\n");return false;}
+		if(i==0x100){_consolePrint("Cannot decode or not DSBooter\n");return false;}
 		for(j=0x000;j<0x200;j++)
 			head[j]=head[j]^i;
 	}
