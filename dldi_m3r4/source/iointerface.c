@@ -332,9 +332,11 @@ bool startup(){
 		sdhc_shift=ret?0:9;
 		*(u32*)0x023ffc24=ret?1:0;
 	}else{ //TTIO or DEMO
-		sdhc_shift=(*(u32*)0x023ffc24)?0:9;
+		sdhc_shift=(*(u32*)0x023ffc24)?0:9; //I assume ttreset is done on DSTT.
 	}
 	return true;
+#elif defined(EX4TF)
+	return ((ReadCardInfo() & 0x04) == 0x04); //lol
 #else
 	return ((ReadCardInfo() & 0x07) == 0x04);
 #endif

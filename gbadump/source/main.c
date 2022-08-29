@@ -40,7 +40,7 @@ void Main(){
 		fclose(f);
 	}
 
-	_consolePrint("Dump proceeded.\n");die();
+	_consolePrint("Dump processed.\n");die();
 
 	// ^^^^^^^^^^^^ add 2008.03.30 kzat3
 }

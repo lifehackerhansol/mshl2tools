@@ -34,7 +34,7 @@ CFLAGS	:=	-Wall -O2 -DUSE_DLDI \
 CFLAGS	+=	$(INCLUDE) -DARM9 -DNDS
 CXXFLAGS	:= $(CFLAGS)
 
-#r32
+#r4x
 ASFLAGS	:=	$(ARCH) -march=armv5te -mtune=arm946e-s
 #r23
 #ASFLAGS	:=	$(ARCH) -march=armv5te -mtune=arm946e-s -DIO_DLDI

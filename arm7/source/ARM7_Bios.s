@@ -14,9 +14,11 @@
 @ is completely locked out from reading.
 @******************************************
 
-.align 4
+.align  4
 .global	ARM7_Bios
+.type   ARM7_Bios STT_FUNC
 .global	SwitchUserMode
+.type   SwitchUserMode STT_FUNC
 
 @-----------------------------------------------------
 @ key table from the NDS ARM7 BIOS (0x1078Byte)

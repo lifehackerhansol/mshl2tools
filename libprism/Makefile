@@ -46,7 +46,7 @@ CFLAGS	+=	$(INCLUDE) -DARM9
 CXXFLAGS	:=	$(CFLAGS)
 
 ASFLAGS	:=	$(ARCH)
-#LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -mno-fpu -Wl,--gc-sections -Wl,-Map,$(notdir $*.map) -Wl,--section-start,.init=0x02000450
+#LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -Wl,--gc-sections -Wl,-Map,$(notdir $*.map) -Wl,--section-start,.init=0x02000450
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project

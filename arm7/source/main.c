@@ -58,6 +58,7 @@ static void Read_Flash(int address, void *destination, int length){
 static u32 fwsize;
 
 static inline void DumpFirmware(){
+	irqDisable(__IRQ__);
 	u32 size=fwsize,dumpsize;
 
 	//Read_Flash(0x20, &size, 2);
@@ -68,10 +69,12 @@ static inline void DumpFirmware(){
 	Read_Flash(0, IPCZ->firmware_addr, dumpsize);
 
 	//IPCZ->firmware_bufsize=size;
+	irqEnable(__IRQ__);
 }
 
 //Write Flash from DSOrganize (not copied, as usual...)
 static void Write_Flash(int address, void *destination){ //length is always 256
+	irqDisable(__IRQ__);
 	int i=0;
 	u8 *dst = (u8*)destination;
 	SerialWaitBusy();
@@ -120,6 +123,7 @@ static void Write_Flash(int address, void *destination){ //length is always 256
 		SerialWaitBusy();
 	}while(REG_SPIDATA&0x01);
 	REG_SPICNT = 0;
+	irqEnable(__IRQ__);
 }
 
 static inline void WriteToFirmware(){
@@ -144,22 +148,37 @@ static inline  void load_PersonalData(){
 		Read_Flash(src ^ 0x100, PersonalData, 0x70);	//try the older copy
 }
 
-static inline  void PCMstartSound(u8 ch, int freq, void* top, u32 size, u8 vol, u8 pan, u8 format){
-	SCHANNEL_TIMER(ch)  		= SOUND_FREQ(freq);
-	SCHANNEL_SOURCE(ch)		= (u32)top;
-	SCHANNEL_LENGTH(ch)		= size >> 2 ;
-	SCHANNEL_REPEAT_POINT(ch)	= 0;
-	SCHANNEL_CR(ch)   		= SCHANNEL_ENABLE | SOUND_REPEAT |
-						  SOUND_VOL(vol)  | SOUND_PAN(pan) |
-						  ((format==8) ? SOUND_FORMAT_8BIT : SOUND_FORMAT_16BIT);
+static inline  void PCMstartSound(int freq, void* topL, void* topR, u32 size, u8 vol, u8 format){
+	u32 arg=SCHANNEL_ENABLE|SOUND_REPEAT|SOUND_VOL(vol)|
+			((format==8) ? SOUND_FORMAT_8BIT : SOUND_FORMAT_16BIT);
+	if(topR&&topR!=topL){
+		SCHANNEL_TIMER(0)  = SCHANNEL_TIMER(1)  = SOUND_FREQ(freq);
+		SCHANNEL_LENGTH(0) = SCHANNEL_LENGTH(1) = size >> 2 ;
+		SCHANNEL_REPEAT_POINT(0) = SCHANNEL_REPEAT_POINT(1) = 0;
+		SCHANNEL_SOURCE(0) = (u32)topL;
+		SCHANNEL_SOURCE(1) = (u32)topR;
+		SCHANNEL_CR(0) = arg|SOUND_PAN(0);
+		SCHANNEL_CR(1) = arg|SOUND_PAN(127);
+	}else{
+		//in this way ARM7's CPU usage is half with monoral audio...
+		SCHANNEL_TIMER(0)  = SOUND_FREQ(freq);
+		SCHANNEL_LENGTH(0) = size >> 2 ;
+		SCHANNEL_REPEAT_POINT(0) = 0;
+		SCHANNEL_SOURCE(0) = (u32)topL;
+		SCHANNEL_CR(0) = arg|SOUND_PAN(64);
+	}
 }
 
-#define PCMstopSound(ch) (SCHANNEL_CR(ch) &= ~SCHANNEL_ENABLE)
+static inline void PCMstopSound(){
+	SCHANNEL_CR(0) &= ~SCHANNEL_ENABLE;
+	SCHANNEL_CR(1) &= ~SCHANNEL_ENABLE;
+}
 
 static u16 keysold=0;
 static touchPosition touch;
 static u8 keyxy=0;
 static u8 lid=0,lidold=0,lidopen=0,lidclose=0;
+static u8 clockcounter=0;
 static int temperature1,temperature2;
 static void VblankHandler(){
 	IPCZ->blanks++; //pseudo timer
@@ -189,6 +208,14 @@ static void VblankHandler(){
 	IPCZ->touchY = touch.py;
 
 	IPCZ->temperature = touchReadTemperature(&temperature1, &temperature2);
+	//rtcGetTimeAndDate(0x02fff800);
+#ifdef _LIBNDS_MAJOR_
+	clockcounter++;
+	if(clockcounter==60){
+		resyncClock();
+		clockcounter=0;
+	}
+#endif
 }
 
 static void sys_exit(){
@@ -233,7 +260,13 @@ int main(){ //int argc, char **argv){
 
 	rtcReset();
 	irqInit();
+
+#ifdef _LIBNDS_MAJOR_
+	//inspired by https://github.com/windwakr/GameYob/commit/b599c83cad29f0406a615c92c2bbcf721286e468
+	resyncClock();
+#else
 	initClockIRQ();
+#endif
 
 	SetYtrigger(80);
 #ifdef _LIBNDS_MAJOR_
@@ -554,9 +587,7 @@ int main(){ //int argc, char **argv){
 				ARM7_Bios(IPCZ->arm7bios_addr,IPCZ->arm7bios_bufsize-1);
 				IPCZ->cmd=0;
 			}else if(IPCZ->cmd==GetFirmware){
-				irqDisable(__IRQ__);
 				DumpFirmware();
-				irqEnable(__IRQ__);
 				IPCZ->cmd=0;
 			}else if(IPCZ->cmd==WriteFirmware){
 				if(IPCZ->firmware_write_index==0||IPCZ->firmware_write_index==1||IPCZ->firmware_write_index==2)
@@ -565,9 +596,7 @@ int main(){ //int argc, char **argv){
 					*(vu16*)(IPCZ->firmware_write_addr+0x72)=swiCRC16(0xffff,IPCZ->firmware_write_addr,0x70);
 				else goto WriteFirmware_abort;
 
-				irqDisable(__IRQ__);
 				WriteToFirmware();
-				irqEnable(__IRQ__);
 WriteFirmware_abort:
 				IPCZ->cmd=0;
 			}else if(IPCZ->cmd==RequestBatteryLevel){
@@ -590,12 +619,15 @@ WriteFirmware_abort:
 				dstt_sdhc=0;
 				IPCZ->cmd=0;
 			}else if(IPCZ->cmd==PlaySound){
-				PCMstartSound(0, IPCZ->PCM_freq, IPCZ->PCM_L, IPCZ->PCM_size, 100,   0, IPCZ->PCM_bits);
-				PCMstartSound(1, IPCZ->PCM_freq, IPCZ->PCM_R, IPCZ->PCM_size, 100, 127, IPCZ->PCM_bits);
+				PCMstartSound(IPCZ->PCM_freq, IPCZ->PCM_L, IPCZ->PCM_R, IPCZ->PCM_size, 127, IPCZ->PCM_bits);
 				IPCZ->cmd=0;
 			}else if(IPCZ->cmd==StopSound){
-				PCMstopSound(0);
-				PCMstopSound(1);
+				PCMstopSound();
+				IPCZ->cmd=0;
+
+			}else if(IPCZ->cmd==UnbrickGWInstaller){
+				Write_Flash(0x1fe00, IPCZ->firmware_write_addr);
+				Write_Flash(0x1ff00, IPCZ->firmware_write_addr+0x100);
 				IPCZ->cmd=0;
 /*
 			}else if(IPCZ->cmd==CPTest){

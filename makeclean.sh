@@ -34,6 +34,9 @@ cd ../..
 cd favlauncher_ms/source
 make clean
 cd ../..
+cd frontend2assoc/source
+make clean
+cd ../..
 cd fwrecovery/source
 make clean
 cd ../..
