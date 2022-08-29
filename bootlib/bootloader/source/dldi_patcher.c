@@ -29,7 +29,7 @@ const byte *dldimagic=(byte*)"\xed\xa5\x8d\xbf Chishm";
 
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
-	return x[0]|(x[1]<<8)|(x[2]<<16)|(x[3]<<24);
+	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24);
 }
 
 void write32(void *p, const unsigned int n){

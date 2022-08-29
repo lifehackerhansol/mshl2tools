@@ -39,10 +39,10 @@ void recursive(u8 *p, int offset, int size/*, char *source, char *target*/){
 			strcpy(sourcefile,targetfile);
 			FILE *f=fopen(source,"rb");
 			fread(head,1,0x160,f);
-			banneroffset=(head[0x06b]<<24)+(head[0x06a]<<16)+(head[0x069]<<8)+head[0x068];
+			banneroffset=read32(head+0x68);
 			if(banneroffset){
 				fseek(f,banneroffset,SEEK_SET);
-				u8 *banner=p+((p[0x06b]<<24)+(p[0x06a]<<16)+(p[0x069]<<8)+p[0x068]);
+				u8 *banner=p+read32(p+0x68);
 				fread(banner,1,2112,f);
 				if(banner[0]!=1)banner[0]=1; //for moonshell2
 				if(banner[1]!=0)banner[1]=0; //for moonshell2
@@ -101,7 +101,7 @@ void Main(){
 	size=getmshl2wrap(&p);
 	if(strcmp((char*)p+0x1e0,"mshl2wrap link"))
 		{_consolePrint("template not mshl2wrap link.\n");die();}
-	offset=(p[0x1f0]<<24)+(p[0x1f1]<<16)+(p[0x1f2]<<8)+p[0x1f3];
+	offset=((unsigned int)p[0x1f0]<<24)+(p[0x1f1]<<16)+(p[0x1f2]<<8)+p[0x1f3];
 	if(size<offset+256*3){_consolePrint("template too small or offset invalid.\n");die();}
 	_consolePrint("Done.\n");
 

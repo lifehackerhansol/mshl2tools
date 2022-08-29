@@ -147,7 +147,7 @@ if(!flag){
 	if(!isHomebrew(head)){
 		strcpy(target,utf8);goto target_set;
 	}else if(!strcmp((char*)head+0x1e0,"mshl2wrap link")){
-		unsigned int s=(head[0x1f0]<<24)+(head[0x1f1]<<16)+(head[0x1f2]<<8)+head[0x1f3];
+		unsigned int s=((unsigned int)head[0x1f0]<<24)+(head[0x1f1]<<16)+(head[0x1f2]<<8)+head[0x1f3];
 		_consolePrint("Detected mshl2wrap link.\n");
 		if(size<s+256*3){fclose(f);goto fail;}
 		fseek(f,s,SEEK_SET);fread(target,1,256*3,f);goto target_set;

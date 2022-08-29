@@ -493,7 +493,7 @@ void writeAddr64(void *mem, const unsigned long long int value){
 
 unsigned int read32(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
-	return x[0]|(x[1]<<8)|(x[2]<<16)|(x[3]<<24);
+	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24);
 }
 
 unsigned int read24(const void *p){
@@ -513,7 +513,7 @@ unsigned char read8(const void *p){
 
 unsigned long long int read64(const void *p){
 	const unsigned char *x=(const unsigned char*)p;
-	return x[0]|(x[1]<<8)|(x[2]<<16)|(x[3]<<24)|( (unsigned long long int)(x[4]|(x[5]<<8)|(x[6]<<16)|(x[7]<<24)) <<32);
+	return x[0]|(x[1]<<8)|(x[2]<<16)|((unsigned int)x[3]<<24)|( (unsigned long long int)(x[4]|(x[5]<<8)|(x[6]<<16)|((unsigned int)x[7]<<24)) <<32);
 }
 
 void write32(void *p, const unsigned int n){

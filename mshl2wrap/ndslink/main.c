@@ -18,9 +18,9 @@ int link(unsigned char *p, const int offset, const int size, const char *target,
 	if(!f)return -1;
 
 	fread(head,1,0x160,f);
-	banneroffset=(head[0x06b]<<24)+(head[0x06a]<<16)+(head[0x069]<<8)+head[0x068];
+	banneroffset=((unsigned int)head[0x06b]<<24)+(head[0x06a]<<16)+(head[0x069]<<8)+head[0x068];
 	if(banneroffset){
-		unsigned char *banner=p+((p[0x06b]<<24)+(p[0x06a]<<16)+(p[0x069]<<8)+p[0x068]);
+		unsigned char *banner=p+(((unsigned int)p[0x06b]<<24)+(p[0x06a]<<16)+(p[0x069]<<8)+p[0x068]);
 		fseek(f,banneroffset,SEEK_SET);
 		fread(banner,1,2112,f);
 		if(banner[0]!=1)banner[0]=1; //for moonshell2
@@ -123,7 +123,7 @@ int main(int argc, char **argv){
 	fclose(f);
 
 	if(strcmp(p+0x1e0,"mshl2wrap link")){free(p);puts("template not mshl2wrap link");return 1;}
-	offset=(p[0x1f0]<<24)+(p[0x1f1]<<16)+(p[0x1f2]<<8)+p[0x1f3];
+	offset=((unsigned int)p[0x1f0]<<24)+(p[0x1f1]<<16)+(p[0x1f2]<<8)+p[0x1f3];
 	if(s<offset+256*3){fclose(f);puts("template too small or offset invalid");return -1;}
 
 	recursive(p,offset,s,targetd,targetd+strlen(targetd),linkd,linkd+strlen(linkd));

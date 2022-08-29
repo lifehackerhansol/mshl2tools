@@ -19,7 +19,7 @@ int link(unsigned char *p, const int offset, const int size, const char *target,
 		{printf("\nWarn: not found target so cannot copy banner. ");goto nobanner;}
 
 	fread(head,1,0x160,f);
-	banner=(head[0x06b]<<24)+(head[0x06a]<<16)+(head[0x069]<<8)+head[0x068];
+	banner=((unsigned int)head[0x06b]<<24)+(head[0x06a]<<16)+(head[0x069]<<8)+head[0x068];
 	if(banner){
 		fseek(f,banner,SEEK_SET);
 		fread(buf,1,2112,f);
@@ -39,7 +39,7 @@ nobanner:
 #else
 	strcpy(p+offset,target);
 #endif
-	if(banner)memcpy(p+((p[0x06b]<<24)+(p[0x06a]<<16)+(p[0x069]<<8)+p[0x068]),buf,2112);
+	if(banner)memcpy(p+(((unsigned int)p[0x06b]<<24)+(p[0x06a]<<16)+(p[0x069]<<8)+p[0x068]),buf,2112);
 	fwrite(p,1,size,f);
 	fclose(f);
 	return 0;
@@ -126,7 +126,7 @@ int main(int argc, char **argv){
 	fclose(f);
 
 	if(strcmp(p+0x1e0,"reset_mse DLDI")){free(p);puts("template not reset_mse");return 1;}
-	offset=(p[0x1f0]<<24)+(p[0x1f1]<<16)+(p[0x1f2]<<8)+p[0x1f3];
+	offset=((unsigned int)p[0x1f0]<<24)+(p[0x1f1]<<16)+(p[0x1f2]<<8)+p[0x1f3];
 	if(s<offset+256*3){fclose(f);puts("template too small or offset invalid");return -1;}
 
 	printf("Linking %s to %s... ",argv[2]+1,argv[3]);
