@@ -984,6 +984,28 @@ int fexists(const char *path){
 void NotifyARM7(u32 c){IPCZ->cmd=c;}
 void CallARM7(u32 c){for(IPCZ->cmd=c;IPCZ->cmd;)swiWaitForVBlank();}
 
+#if 0
+void NotifyARM7(u32 argc, ...){
+	va_list list;
+	va_start(list,argc);
+	for(i=0;i<argc;i++){
+		IPCZ->args[i]=va_arg(list, u32);
+	}
+	va_end(list);
+	IPCZ->argc=argc;
+}
+void CallARM7(u32 argc, ...){
+	va_list list;
+	va_start(list,argc);
+	for(i=0;i<argc;i++){
+		IPCZ->args[i]=va_arg(list, u32);
+	}
+	va_end(list);
+	IPCZ->argc=argc;
+	for(;IPCZ->argc;)swiWaitForVBlank();
+}
+#endif
+
 int strchrindex(const char *s, const int c, const int idx){
 	const char *ret=strchr(s+idx,c);
 	if(!ret)return -1;

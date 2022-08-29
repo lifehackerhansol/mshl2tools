@@ -50,7 +50,7 @@ ok:
 	}
 	mydirclose(dp);
 	if(contentcount<2)return;
-	if(contentcount>4096)_consolePrint2("contentcount>4096. sort skipped.\n");
+	if(contentcount>4096){_consolePrint2("contentcount>4096. sort skipped.\n");return;}
 	{
 		fileinfo *fI;
 		int i,j;
@@ -188,8 +188,9 @@ exec:
 }
 
 bool runRPGLink(const char *file){
-	strcpy((char*)0x023fda00,"fat1:");
-	strcpy((char*)0x023fda05,file);
+	//strcpy((char*)0x023fda00,"fat1:");
+	//strcpy((char*)0x023fda05,file);
+	strcpy((char*)0x023fda00,file);
 	return ret_menu9_Gen("/__rpg/rpglink.nds");
 }
 

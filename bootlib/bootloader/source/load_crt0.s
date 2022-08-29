@@ -38,7 +38,7 @@ _start:
 	b	startUp
 	
 storedFileCluster:
-	.word	0x0FFFFFFF		@ default _BOOT_DS.NDS
+	.word	0x0FFFFFFF		@ default BOOT.NDS
 initDisc:
 	.word	0x00000001		@ init the disc by default
 wantToPatchDLDI:
@@ -52,11 +52,10 @@ dldiOffset:
 	.word	_dldi_start - _start
 dsiSD:
 	.word	0
-	
+
 startUp:
 	mov	r0, #0x04000000		@ IME = 0;
-	add	r0, r0, #0x208
-	strh	r0, [r0]
+	strb	r0, [r0,#0x208]
 
 	mov	r0, #0x12		@ Switch to IRQ Mode
 	msr	cpsr, r0

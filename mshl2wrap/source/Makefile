@@ -20,7 +20,7 @@ linkmaker: linkmaker.c
 ### final build script ###
 ../$(TARGET).nds	:	$(TARGET).arm9 linkmaker
 	ndstool	-c $(TARGET).nds -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -b $(TARGET).bmp "MoonShell2 Link;Launcher based on;reset_mse_06b_for_ak2"
-	linkmaker $(TARGET).nds
+	./linkmaker $(TARGET).nds
 	mv -f	$(TARGET).nds ../
 
 ### compile main.c ###
@@ -35,7 +35,7 @@ CFLAGS	:=	-Wall -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
 			-ffast-math -fdata-sections \
 			$(ARCH) -DARM9
-LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -mno-fpu -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
+LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
 LDFLAGS	+=	-Wl,--section-start,.init=0x02000000
 
 $(TARGET).arm9: main.c

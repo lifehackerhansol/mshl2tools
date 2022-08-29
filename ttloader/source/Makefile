@@ -17,7 +17,7 @@ clean:
 ### final build script ###
 ../$(TARGET).nds	:	$(TARGET).arm9 linkmaker
 	ndstool	-c $(TARGET).nds -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -r9 0x02000000 -b $(TARGET).bmp "ttloader extlink"
-	#linkmaker	reset.mse
+	#./linkmaker	reset.mse
 	dldipatch	../../xenofile/source/dldi/ttio.dldi $(TARGET).nds
 	#mselink	reset.mse /YSMenu/ttpatch.dat $(TARGET).nds
 	#rm		reset.mse
@@ -38,7 +38,7 @@ CFLAGS	:=	-Wall -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
 			-ffast-math -fdata-sections \
 			$(ARCH) -DARM9
-LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -mno-fpu -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
+LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
 LDFLAGS	+=	-Wl,--section-start,.init=0x02000000
 
 $(TARGET).arm9: main.c

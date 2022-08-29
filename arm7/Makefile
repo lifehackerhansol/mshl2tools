@@ -34,7 +34,7 @@ CXXFLAGS	:=	$(CFLAGS)
 
 
 ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-specs=ds_arm7.specs -g $(ARCH) -mno-fpu -Wl,-Map,$(notdir $*).map -Wl,--section-start,.init=0x037f8000
+LDFLAGS	=	-specs=ds_arm7.specs -g $(ARCH) -Wl,-Map,$(notdir $*).map -Wl,--section-start,.init=0x037f8000
 
 LIBS	:= -lnds7
 

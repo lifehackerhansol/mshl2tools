@@ -17,7 +17,7 @@ clean:
 ### final build script ###
 ../$(TARGET).nds	:	$(TARGET).arm9 linkmaker
 	ndstool	-c $(TARGET).mse -7 ../../arm7/arm7.bin -9 $(TARGET).arm9 -r9 0x02000000 -b $(TARGET).bmp "YSMenu for all flashcarts"
-	linkmaker	$(TARGET).mse
+	./linkmaker	$(TARGET).mse
 	mselink	$(TARGET).mse /ysmenu.dat $(TARGET).nds
 	rm		$(TARGET).mse
 	mv -f		$(TARGET).nds ../
@@ -37,7 +37,7 @@ CFLAGS	:=	-Wall -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
 			-ffast-math -fdata-sections \
 			$(ARCH) -DARM9
-LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -mno-fpu -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
+LDFLAGS	=	-s -specs=ds_arm9.specs $(ARCH) -Wl,--gc-sections -Wl,-Map,$(notdir $*.map)
 LDFLAGS	+=	-Wl,--section-start,.init=0x02000000
 
 $(TARGET).arm9: main.c

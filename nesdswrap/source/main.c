@@ -36,7 +36,7 @@ u32 keys;
 	hold Down:   nesDS r87+ (0.56a1)
 	hold Left:   
 	hold Right:  
-	none:        nesDS r98 (1.0)
+	none:        nesDS r114 (1.1b)
 
 	nesDS EX series 0.22/0.30 aren't implemented. Use 0.31 (final version).
 	Please note that nesDS ORG/EX/0.44's arm7 are shared.

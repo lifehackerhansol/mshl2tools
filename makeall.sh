@@ -34,6 +34,9 @@ cd ../..
 cd favlauncher_ms/source
 make
 cd ../..
+cd frontend2assoc/source
+make
+cd ../..
 cd fwrecovery/source
 make
 cd ../..

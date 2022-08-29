@@ -13,6 +13,8 @@ extern int hidehidden;
 //u32 sound_status,vflag,playtime,playtime_v,playtime_flag;
 //u32 need_read,prev_timer;
 
+#define CounterPerSample 5
+
 void startSound(u32 freq, void *top_L, void *top_R, u32 size, u32 format){
 	IPCZ->cmd=StopSound;
 	while(IPCZ->cmd)swiWaitForVBlank();
@@ -22,7 +24,7 @@ void startSound(u32 freq, void *top_L, void *top_R, u32 size, u32 format){
 	IPCZ->PCM_R=top_R;
 	IPCZ->PCM_size=size;
 	IPCZ->PCM_bits=format;
-	DC_FlushAll();
+	//DC_FlushAll();
 	NotifyARM7(PlaySound);
 	while(IPCZ->cmd)swiWaitForVBlank();
 	
@@ -35,9 +37,9 @@ void startSound(u32 freq, void *top_L, void *top_R, u32 size, u32 format){
 	//need_read    = 0;
 
 	TIMER1_DATA	= 0;							// For counting samples
-	TIMER1_CR	= TIMER_ENABLE | TIMER_DIV_1 | TIMER_CASCADE;
-	TIMER0_DATA	= (65536-33554432/(freq)); //TIMER_FREQ(freq);		// Equal to sampling freq.
-	TIMER0_CR	= TIMER_ENABLE | TIMER_DIV_1;
+	TIMER1_CR	= TIMER_ENABLE | TIMER_CASCADE;
+	TIMER0_DATA	= 65536-33554432/(freq); //33513982 isn't ok.
+	TIMER0_CR	= TIMER_DIV_1 | TIMER_ENABLE;
 }
 
 void stopSound(){
@@ -121,7 +123,7 @@ char *context[]={
 	"Run as homebrew",
 	"Run as hb after swapping cart",
 	"Run as DSBooter",
-	//"Run as DSBooter  (Raw)",
+	//"Run as DSBooter (Raw)",
 	"Run as R4 kernel (only on R4)",
 	"Manual DLDI patch",
 	"Open in text editor",
@@ -135,7 +137,9 @@ char *systemmenu[]={
 	"Show M3 Region / R4 Jumper",
 	"Swap microSD",
 	"Change DLDI",
+	"Dump DLDI (dldicaptor)",
 	"Dump Bios/Firmware",
+	"Dump GBA",
 	"Test microSD speed",
 	"Fix FSInfo sector",
 	"Return to firmware(moonshl2)",
@@ -195,7 +199,9 @@ enum{
 	sys_m3region,
 	sys_swapsd,
 	sys_changedldi,
+	sys_dldicaptor,
 	sys_bios,
+	sys_dumpgba,
 	sys_testsd,
 	sys_fixfsinfo,
 	sys_return,
@@ -753,8 +759,11 @@ bmp_fail:
 				strcat(file,p->name);
 				_consolePrintf2("Playing %s\n",file);
 				f=fopen(file,"rb");
+
+				u8 *p=NULL;
+				if(!f){_consolePrint2("Cannot open file\n");goto u8m_fail;}
 				fstat(fileno(f),&st);
-				u8 *p=malloc(st.st_size);
+				p=malloc(st.st_size);
 				if(!p){_consolePrint2("Cannot alloc\n");goto u8m_fail;}
 				fread(p,1,st.st_size,f);
 				fclose(f);
@@ -799,94 +808,75 @@ u8m_fail:
 					stopSound();
 					_consolePrint2("Opening...\n");
 					if(!PB->pSL->Start((int)f)){_consolePrint2("cannot open music.\n");goto msp_fail;}
+
+					int SoundBufferLength=16;
+
 					u16 sampleperframe=PB->pSL->GetSamplePerFrame();
+					while(sampleperframe*SoundBufferLength>63488)SoundBufferLength/=2;
+/*
+					if(sampleperframe*SoundBufferLength>63488){
+						DLLList_FreePlugin(PB);
+						fclose(f);
+						_consolePrint2(
+							"Programmer's fault:\n"
+							"sampleperframe(%u)*SoundBufferLength(%d)\n"
+							"exceeded 65536*31/32.\n"
+							"means SoundBufferLength is too big to determine EOF.\n"
+							,sampleperframe,SoundBufferLength
+						);
+						die();
+					}
+*/
 					u16 channel=PB->pSL->GetChannelCount();
-					s16 *pL=(s16*)malloc(2*sampleperframe*16);
-					s16 *pR=NULL;
-					if(channel>1)pR=(s16*)malloc(2*sampleperframe*16);
-					if(!pL||(channel>1&&!pR)){
-						if(pL)free(pL);
-						if(pR)free(pR);
+					s16 *pL_malloc=(s16*)malloc(2*sampleperframe*SoundBufferLength);
+					s16 *pR_malloc=NULL;
+					if(channel>1)pR_malloc=(s16*)malloc(2*sampleperframe*SoundBufferLength);
+					if(!pL_malloc||(channel>1&&!pR_malloc)){
+						free(pL_malloc);
+						free(pR_malloc);
 						_consolePrint2("cannot alloc buffer.\n");goto msp_fail;
 					}
+					s16 *pL=memUncached(pL_malloc);
+					s16 *pR=pR_malloc?memUncached(pR_malloc):NULL;
+					
 					int f=0;
-					for(;f<8;f++){
-						PB->pSL->Update(pL+sampleperframe*(2*f),channel>1?pR+sampleperframe*(2*f):NULL);
-						PB->pSL->Update(pL+sampleperframe*(2*f+1),channel>1?pR+sampleperframe*(2*f+1):NULL);
+					for(;f<SoundBufferLength;f++){
+						PB->pSL->Update(pL+sampleperframe*(f),channel>1?pR+sampleperframe*(f):NULL);
 					}
-					startSound(PB->pSL->GetSampleRate(),pL,channel>1?pR:pL,2*sampleperframe*16,16);
+					f=0;
+					startSound(PB->pSL->GetSampleRate(),pL,channel>1?pR:pL,2*sampleperframe*SoundBufferLength,16);
 					IPCZ->blanks=0;
 
 					//while(IPCZ->keysheld)swiWaitForVBlank();
 					_consolePrint2("\nPress any key to end.\n");
+
 //_consolePrintf2("%08x\n",sampleperframe);
-					f=0;
 					u16 oldtime=0;
 					while(!IPCZ->keysdown){ //mainloop.
 						u16 newtime=TIMER1_DATA;
-//_consolePrintf("%08x %08x\n",newtime,sampleperframe*2+oldtime);
-						while((u16)(newtime-oldtime)>=sampleperframe*2){
+						if((u16)(newtime-oldtime)>=sampleperframe){ // pL+sampleperframe*(f) played. played buffer must be filled with new samples.
 							u16 ret=0;
-//_consolePrintf("%d %08x %08x\n",f,newtime-oldtime,TIMER1_DATA);
-
-							///in case of delay...
-							if((u16)(newtime-oldtime)>=sampleperframe*14){
-								ret+=PB->pSL->Update(pL+sampleperframe*(2*f),channel>1?pR+sampleperframe*(2*f):NULL);
-								ret+=PB->pSL->Update(pL+sampleperframe*(2*f+1),channel>1?pR+sampleperframe*(2*f+1):NULL);
-								f++;
-								if(f==8)f=0;
+							while((u16)(newtime-oldtime)>=sampleperframe){
+								//to avoid (with monoral) R channel's NULL is bugged by msp.
+								ret=PB->pSL->Update(pL+sampleperframe*(f),channel>1?(pR+sampleperframe*(f)):(pL+sampleperframe*(f)));
+								f=(f+1)%SoundBufferLength;
+								if(ret<sampleperframe){
+									//after newtime reaches oldtime,
+									while((u16)(TIMER1_DATA-oldtime)<ret);
+									oldtime+=ret;
+									//need to output sampleperframe*SoundBufferLength samples.
+									while((u16)(TIMER1_DATA-oldtime)<(u16)(sampleperframe*SoundBufferLength));
+									goto msp_sound_finalize;
+								}
+								oldtime+=sampleperframe;
 							}
-							if((u16)(newtime-oldtime)>=sampleperframe*12){
-								ret+=PB->pSL->Update(pL+sampleperframe*(2*f),channel>1?pR+sampleperframe*(2*f):NULL);
-								ret+=PB->pSL->Update(pL+sampleperframe*(2*f+1),channel>1?pR+sampleperframe*(2*f+1):NULL);
-								f++;
-								if(f==8)f=0;
-							}
-							if((u16)(newtime-oldtime)>=sampleperframe*10){
-								ret+=PB->pSL->Update(pL+sampleperframe*(2*f),channel>1?pR+sampleperframe*(2*f):NULL);
-								ret+=PB->pSL->Update(pL+sampleperframe*(2*f+1),channel>1?pR+sampleperframe*(2*f+1):NULL);
-								f++;
-								if(f==8)f=0;
-							}
-							if((u16)(newtime-oldtime)>=sampleperframe*8){
-								ret+=PB->pSL->Update(pL+sampleperframe*(2*f),channel>1?pR+sampleperframe*(2*f):NULL);
-								ret+=PB->pSL->Update(pL+sampleperframe*(2*f+1),channel>1?pR+sampleperframe*(2*f+1):NULL);
-								f++;
-								if(f==8)f=0;
-							}
-							if((u16)(newtime-oldtime)>=sampleperframe*6){
-								ret+=PB->pSL->Update(pL+sampleperframe*(2*f),channel>1?pR+sampleperframe*(2*f):NULL);
-								ret+=PB->pSL->Update(pL+sampleperframe*(2*f+1),channel>1?pR+sampleperframe*(2*f+1):NULL);
-								f++;
-								if(f==8)f=0;
-							}
-							if((u16)(newtime-oldtime)>=sampleperframe*4){
-								ret+=PB->pSL->Update(pL+sampleperframe*(2*f),channel>1?pR+sampleperframe*(2*f):NULL);
-								ret+=PB->pSL->Update(pL+sampleperframe*(2*f+1),channel>1?pR+sampleperframe*(2*f+1):NULL);
-								f++;
-								if(f==8)f=0;
-							}
-							///
-
-							ret+=PB->pSL->Update(pL+sampleperframe*(2*f),channel>1?pR+sampleperframe*(2*f):NULL);
-							ret+=PB->pSL->Update(pL+sampleperframe*(2*f+1),channel>1?pR+sampleperframe*(2*f+1):NULL);
-							f++;
-							if(f==8)f=0;
-							oldtime=newtime;
-							DC_FlushAll();
-
 							_consolePrintfOnce2("Playing Time %02d:%02d",IPCZ->blanks/3600,IPCZ->blanks/60%60);
-
-							if(ret<sampleperframe*2){
-								while(TIMER1_DATA-oldtime<ret);
-								goto msp_sound_finalize;
-							}
 						}
 					}
 msp_sound_finalize:
-					_consolePrintOnceEnd2();
 					stopSound();
-					free(pL);if(pR)free(pR);
+					_consolePrintOnceEnd2();
+					free(pL_malloc);free(pR_malloc);
 					goto msp_sound_end;
 				}
 msp_fail:
@@ -1564,7 +1554,7 @@ attr_cancel:
 						fclose(f);
 #else
 					{
-						_consolePrint2("Trimming feature isn't available in legacy edition.\n");
+						_consolePrint2("Trimming feature isn't available in legacy edition because of the lack of ftruncate().\n");
 #endif
 						while(IPCZ->keysheld)swiWaitForVBlank();
 						_consolePrint2("Press any key.\n");
@@ -1850,7 +1840,7 @@ char *region[]={
 	"NOE/GER:Germany", //D
 	"USA", //E
 	"FRA:France",
-	"Unknown" //G
+	"Unknown", //G
 	"HOL:Netherlands",
 	"ITA:Italy",
 	"JPN:Japan",
@@ -2022,17 +2012,17 @@ char *region[]={
 				}break;
 #endif
 				case sys_return:{
-					char *file="/moonshl2/resetmse/zzzz.nds";
+					char file[]="/moonshl2/resetmse/zzzz.nds";
 					memcpy(file+19,DLDIDATA+ioType,4);
 					destroyfilelist();
 					_consoleClear();
 					_consolePrintf2("Selected %s\n",file);
 					BootLibrary(file);
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrint("Failed. Press any key.\n");
+					_consolePrint2("Failed. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
-					usage();
 					getfilelist(dir,filter);
+					usage();
 				}break;
 				case sys_dsmenu:{
 					destroyfilelist();
@@ -2049,8 +2039,8 @@ char *region[]={
 					while(IPCZ->keysheld)swiWaitForVBlank();
 					_consolePrint2("Failed. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
-					usage();
 					getfilelist(dir,filter);
+					usage();
 				}break;
 				case sys_bootstub:{
 					jumpBootStub();
@@ -2059,6 +2049,31 @@ char *region[]={
 				case sys_shutdown:{
 					disc_unmount();
 					IPCZ->cmd=Shutdown;
+				}break;
+				case sys_dldicaptor:{
+					//destroyfilelist();
+					_consoleClear2();
+
+					_consolePrint2("Capturing DLDI into file...\n");
+					char dldiname[768];
+					strcpy(dldiname,"/");
+					memcpy(dldiname+1,(char*)DLDIDATA+ioType,4);
+					dldiname[5]='_';
+					char *pname=dldiname+6,*friendlyname=(char*)DLDIDATA+friendlyName;
+					int i=0;
+					for(;i<strlen(friendlyname);i++)
+					if(0x20<=friendlyname[i] && friendlyname[i]<0x7f && !strchr("\\/:*?\"<>|",friendlyname[i]))
+						*pname++=friendlyname[i];
+					else
+						*pname++='_';
+					strcpy(pname,".dldi");
+					dldi2(NULL,0,0,dldiname);
+
+					while(IPCZ->keysheld)swiWaitForVBlank();
+					_consolePrint2("Processed. Press any key.\n");
+					while(!IPCZ->keysdown)swiWaitForVBlank();
+					getfilelist(dir,filter); // required, since dldicaptor creates new file
+					usage();
 				}break;
 				case sys_bios:{
 					if(GetRunningMode()){_consolePrint2("not supported in DSi mode.\n");continue;}
@@ -2102,8 +2117,32 @@ bios_end:
 					while(IPCZ->keysheld)swiWaitForVBlank();
 					_consolePrint2("Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
-					usage();
 					getfilelist(dir,filter);
+					usage();
+				}break;
+				case sys_dumpgba:{
+					if(IPCZ->NDSType>=NDSi){_consolePrint2("not supported in DSi.\n");continue;}
+					//destroyfilelist();
+					_consoleClear2();
+
+					_consolePrint2("Dumping slot2...\n");
+					int i=0,j;
+					FILE *f=fopen("/GBADUMP.GBA","wb");
+					_consoleStartProgress2();
+					for(;i<32;i++)
+						for(j=0;j<1024*1024;){
+							fwrite((u8*)0x08000000+i*1024*1024+j,65536,1,f);
+							j+=65536;
+							_consolePrintProgress2("Dumping",i*1024*1024+j,32*1024*1024);
+						}
+					_consoleEndProgress2();
+					fclose(f);
+
+					while(IPCZ->keysheld)swiWaitForVBlank();
+					_consolePrint2("Processed. Press any key.\n");
+					while(!IPCZ->keysdown)swiWaitForVBlank();
+					getfilelist(dir,filter); // required, since gbadump creates new file
+					usage();
 				}break;
 				case sys_testsd:{
 					FILE *f;
@@ -2190,8 +2229,8 @@ testsd_end:
 					while(IPCZ->keysheld)swiWaitForVBlank();
 					_consolePrint2("Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
-					usage();
 					getfilelist(dir,filter);
+					usage();
 				}break;
 				case sys_fixfsinfo:{
 #ifdef LIBELM
