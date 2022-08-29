@@ -49,8 +49,6 @@ void Main(){
 
 	char ininame[768];
 
-	IPCZ->cmd=0;
-
 	_consolePrintf(
 		"SavBackup\n"
 		//"reset_mse_06b_for_ak2 by Moonlight, Rudolph, kzat3\n"
@@ -66,23 +64,23 @@ void Main(){
 		_consolePrintf("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
 	}
 
-	_consolePrintf("Initializing libfat... ");
-	if(!fatInitDefault()){_consolePrintf("Failed.\n");die();}
-	_consolePrintf("Done.\n");
+	_consolePrint("Initializing FAT... ");
+	if(!disc_mount()){_consolePrint("Failed.\n");die();}
+	_consolePrint("Done.\n");
 
-	_consolePrintf("Configuring...\n");
+	_consolePrint("Configuring...\n");
 {
-	if(!strcpy_safe(ininame,findpath(4,(char*[]){"/","/_dstwoplug/","/ismartplug/",mypath},"savbackup.ini"))){_consolePrintf("As this scans whole folder, savbackup.ini configuration is required.\n");die();}
+	if(!strcpy_safe(ininame,findpath(6,(char*[]){"/","/_dstwoplug/","/ismartplug/","/_iMenu/_ini/","/_plugin_/",mypath},"savbackup.ini"))){_consolePrint("As this scans whole folder, savbackup.ini configuration is required.\n");die();}
 	ini_gets("savbackup","scandir","",source,768,ininame);
 	ini_gets("savbackup","bakdir",source,target,768,ininame);
 	BackupAsSav=ini_getl("savbackup","BackupAsSav",0,ininame);
 	BidirectionalCopy=ini_getl("savbackup","BidirectionalCopy",0,ininame);
 #ifndef _LIBNDS_MAJOR_
 	if(BidirectionalCopy){
-		_consolePrintf("BidirectionalCopy option cannot be enabled on legacy version. Halt.\n");die();
+		_consolePrint("BidirectionalCopy option cannot be enabled on legacy version. Halt.\n");die();
 	}
 #endif
-	if(!*source||!*target){_consolePrintf("As this scans whole folder, savbackup.ini configuration is required.\n");die();}
+	if(!*source||!*target){_consolePrint("As this scans whole folder, savbackup.ini configuration is required.\n");die();}
 	if(source[strlen(source)-1]!='/')strcat(source,"/");
 	if(target[strlen(target)-1]!='/')strcat(target,"/");
 	if(!strcasecmp(source,target)){
@@ -90,8 +88,8 @@ void Main(){
 	}else{
 		mkpath(target);
 	}
-	_consolePrintf("Backing up...\n");
+	_consolePrint("Backing up...\n");
 	recursive();
 }
-	_consolePrintf("Done.\n");die();
+	_consolePrint("Done.\n");die();
 }

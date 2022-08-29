@@ -30,15 +30,16 @@ void Main(){
 		_consolePrintf("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
 	}
 
-	_consolePrintf("Initializing libfat... ");
-	if(!fatInitDefault()){_consolePrintf("Failed.\n");die();}
-	_consolePrintf("Done.\n");
+	_consolePrint("Initializing FAT... ");
+	if(!disc_mount()){_consolePrint("Failed.\n");die();}
+	_consolePrint("Done.\n");
 
-	//_consolePrintf("Reading /favlauncher.ini Phase1 ");
-	_consolePrintf("Checking for favlauncher.ini...\n");
+	//_consolePrint("Reading /favlauncher.ini Phase1 ");
+	_consolePrint("Checking for favlauncher.ini...\n");
 
-if(strcpy_safe(ininame,findpath(2,(char*[]){"/",mypath},"favlauncher.ini"))){
-	_consolePrintf("Reading favlauncher.ini...\n");
+	char *inisuccess=strcpy_safe(ininame,findpath(6,(char*[]){"/","/_dstwoplug/","/ismartplug/","/_iMenu/_ini/","/_plugin_/",mypath},"favlauncher.ini"));
+if(inisuccess){
+	_consolePrint("Reading favlauncher.ini...\n");
 	ini_gets("General","A","/_menu_a.nds",menu_a,768,ininame);
 	ini_gets("General","B","/_menu_b.nds",menu_b,768,ininame);
 	ini_gets("General","X","/_menu_x.nds",menu_x,768,ininame);
@@ -55,7 +56,7 @@ if(strcpy_safe(ininame,findpath(2,(char*[]){"/",mypath},"favlauncher.ini"))){
 	ini_gets("General","None","/_menu_.nds",menu_none,768,ininame);
 	usenone=ini_getl("General","UseNone",0,ininame);
 
-	//_consolePrintf("Phase2");
+	//_consolePrint("Phase2");
 	ini_gets(dldiid,"A",menu_a,menu_a,768,ininame);
 	ini_gets(dldiid,"B",menu_b,menu_b,768,ininame);
 	ini_gets(dldiid,"X",menu_x,menu_x,768,ininame);
@@ -88,96 +89,95 @@ if(strcpy_safe(ininame,findpath(2,(char*[]){"/",mypath},"favlauncher.ini"))){
 	//strcpy(menu_none,"/_menu_.nds");
 }
 
-if(!usenone){
-	_consolePrintf("     A ");
-	_consolePrintf(menu_a);
-	_consolePrintf("\n     B ");
-	_consolePrintf(menu_b);
-	_consolePrintf("\n     X ");
-	_consolePrintf(menu_x);
-	_consolePrintf("\n     Y ");
-	_consolePrintf(menu_y);
-	_consolePrintf("\n Start ");
-	_consolePrintf(menu_st);
-	_consolePrintf("\nSelect ");
-	_consolePrintf(menu_se);
-	_consolePrintf("\n     L ");
-	_consolePrintf(menu_l);
-	_consolePrintf("\n     R ");
-	_consolePrintf(menu_r);
-	_consolePrintf("\n Touch ");
-	_consolePrintf(menu_touch);
-	_consolePrintf("\n    Up ");
-	_consolePrintf(menu_crossu);
-	_consolePrintf("\n  Down ");
-	_consolePrintf(menu_crossd);
-	_consolePrintf("\n  Left ");
-	_consolePrintf(menu_crossl);
-	_consolePrintf("\n Right ");
-	_consolePrintf(menu_crossr);
-	//_consolePrintf("\n  None ");
-	//_consolePrintf(menu_none);
+if(!usenone&&inisuccess){
+	_consolePrint("     A ");
+	_consolePrint(menu_a);
+	_consolePrint("\n     B ");
+	_consolePrint(menu_b);
+	_consolePrint("\n     X ");
+	_consolePrint(menu_x);
+	_consolePrint("\n     Y ");
+	_consolePrint(menu_y);
+	_consolePrint("\n Start ");
+	_consolePrint(menu_st);
+	_consolePrint("\nSelect ");
+	_consolePrint(menu_se);
+	_consolePrint("\n     L ");
+	_consolePrint(menu_l);
+	_consolePrint("\n     R ");
+	_consolePrint(menu_r);
+	_consolePrint("\n Touch ");
+	_consolePrint(menu_touch);
+	_consolePrint("\n    Up ");
+	_consolePrint(menu_crossu);
+	_consolePrint("\n  Down ");
+	_consolePrint(menu_crossd);
+	_consolePrint("\n  Left ");
+	_consolePrint(menu_crossl);
+	_consolePrint("\n Right ");
+	_consolePrint(menu_crossr);
+	//_consolePrint("\n  None ");
+	//_consolePrint(menu_none);
+	_consolePrint("\n");
 }
-	_consolePrintf("\n");
 
-	//_consolePrintf("Now start select procedure.\n");
+	//_consolePrint("Now start select procedure.\n");
 
 	for(;;c++){
 		swiWaitForVBlank();
 		keys=0;
-		if(!c)_consolePrintf("\nPress desired key: ");
-		//_consolePrintf("\r");
+		if(!c)_consolePrint("\nPress desired key: ");
 		keys = IPCZ->keysheld;
 		if(keys/*&0x1fff*/||usenone)break;
 	}
 
-			if(keys&KEY_A){_consolePrintf("A");file=menu_a;}
-		else	if(keys&KEY_B){_consolePrintf("B");file=menu_b;}
-		else	if(keys&KEY_X){_consolePrintf("X");file=menu_x;}
-		else	if(keys&KEY_Y){_consolePrintf("Y");file=menu_y;}
-		else	if(keys&KEY_L){_consolePrintf("L");file=menu_l;}
-		else	if(keys&KEY_R){_consolePrintf("R");file=menu_r;}
-		else	if(keys&KEY_START){_consolePrintf("Start");file=menu_st;}
-		else	if(keys&KEY_SELECT){_consolePrintf("Select");file=menu_se;}
-		else	if(keys&KEY_TOUCH){_consolePrintf("Touch");file=menu_touch;}
-		else	if(keys&KEY_UP){_consolePrintf("Up");file=menu_crossu;}
-		else	if(keys&KEY_DOWN){_consolePrintf("Down");file=menu_crossd;}
-		else	if(keys&KEY_LEFT){_consolePrintf("Left");file=menu_crossl;}
-		else	if(keys&KEY_RIGHT){_consolePrintf("Right");file=menu_crossr;}
-		else	{_consolePrintf("None");file=menu_none;}
+			if(keys&KEY_A){_consolePrint("A");file=menu_a;}
+		else	if(keys&KEY_B){_consolePrint("B");file=menu_b;}
+		else	if(keys&KEY_X){_consolePrint("X");file=menu_x;}
+		else	if(keys&KEY_Y){_consolePrint("Y");file=menu_y;}
+		else	if(keys&KEY_L){_consolePrint("L");file=menu_l;}
+		else	if(keys&KEY_R){_consolePrint("R");file=menu_r;}
+		else	if(keys&KEY_START){_consolePrint("Start");file=menu_st;}
+		else	if(keys&KEY_SELECT){_consolePrint("Select");file=menu_se;}
+		else	if(keys&KEY_TOUCH){_consolePrint("Touch");file=menu_touch;}
+		else	if(keys&KEY_UP){_consolePrint("Up");file=menu_crossu;}
+		else	if(keys&KEY_DOWN){_consolePrint("Down");file=menu_crossd;}
+		else	if(keys&KEY_LEFT){_consolePrint("Left");file=menu_crossl;}
+		else	if(keys&KEY_RIGHT){_consolePrint("Right");file=menu_crossr;}
+		else	{_consolePrint("None");file=menu_none;}
 
-	_consolePrintf(".\n");
+	_consolePrint(".\n");
 
 	for(c=0;;c++){
 		swiWaitForVBlank();
-		if(!c)_consolePrintf("Now release all keys to ensure to boot the NDS cleanly... ");
+		if(!c)_consolePrint("Now release all keys to ensure to boot the NDS cleanly... ");
 		if(!IPCZ->keysheld)break;
 	}
-	_consolePrintf("OK.\n\n");
+	_consolePrint("OK.\n\n");
 
-	//_consolePrintf("Waiting... ");
+	//_consolePrint("Waiting... ");
 	//sleep(1);
-	//_consolePrintf("Done.\n");
+	//_consolePrint("Done.\n");
 
 	// vvvvvvvvvvv add 2008.03.30 kzat3
 	//_consolePrintf("allocating %s...\n",file);
 //#ifdef GPL
 	//if (!strcmp(dldiid,"EZ5H")||!strcmp(dldiid,"EDGE")||!strcmp(dldiid,"SCDS")
 	//||!ret_menu9_Gen(file)){
-		_consolePrintf("falling back to Chishm VRAM bootlib.\n");
+		_consolePrint("falling back to Chishm VRAM bootlib.\n");
 		//fifoSendValue32(FIFO_USER_07,2);
-		runNdsFile(file);
+		runNdsFileViaStub(file); //runNdsFile() isn't good on libelm
 	//}else{
-	//	_consolePrintf("allocate done.\n");
+	//	_consolePrint("allocate done.\n");
 	//}
 /*
 #else
 	//if(!strcmp(dldiid,"EZ5H")||!strcmp(dldiid,"EDGE")||!strcmp(dldiid,"SCDS"))
-	//	_consolePrintf("this card not supported by ret_menu*_Gen() but we just try to use it since Chishm VRAM bootlib is not linked.\n");
+	//	_consolePrint("this card not supported by ret_menu*_Gen() but we just try to use it since Chishm VRAM bootlib is not linked.\n");
 	//if(ret_menu9_Gen(file)){
-	//	_consolePrintf("allocate done.\n");
+	//	_consolePrint("allocate done.\n");
 	//}else{
-	//	_consolePrintf("allocate failed (Chishm VRAM bootlib is not linked so big nds code cannot load).\n");die();
+	//	_consolePrint("allocate failed (Chishm VRAM bootlib is not linked so big nds code cannot load).\n");die();
 	//}
 #endif
 */
@@ -186,9 +186,9 @@ if(!usenone){
 	//IPCEX->RESET=RESET;
 	IPCZ->cmd=ResetRudolph;
        //fifoSendValue32(FIFO_USER_07,1);
-	_consolePrintf("rebooting... \n");
+	_consolePrint("rebooting... \n");
 	ret_menu9_GENs();
-	_consolePrintf("failed.\n");
+	_consolePrint("failed.\n");
 	die();
 */
 	// ^^^^^^^^^^^^ add 2008.03.30 kzat3

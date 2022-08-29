@@ -15,7 +15,7 @@ int getmshl2wrap(u8 **mshl2wrap){
 
 static u8 head[0x160];
 static char tmp[768];
-char source[768],target[768];
+static char source[768],target[768];
 void recursive(u8 *p, int offset, int size/*, char *source, char *target*/){
 	DIR_ITER *dp;
 	struct stat st;
@@ -65,8 +65,6 @@ void Main(){
 	unsigned char *dldiFileData=DLDIDATA;
 	char ininame[768];
 
-	IPCZ->cmd=0;
-
 	_consolePrintf(
 		"NDSLink on DS\n"
 		//"reset_mse_06b_for_ak2 by Moonlight, Rudolph, kzat3\n"
@@ -82,39 +80,39 @@ void Main(){
 		_consolePrintf("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
 	}
 
-	_consolePrintf("Initializing libfat... ");
-	if(!fatInitDefault()){_consolePrintf("Failed.\n");die();}
-	_consolePrintf("Done.\n");
+	_consolePrint("Initializing FAT... ");
+	if(!disc_mount()){_consolePrint("Failed.\n");die();}
+	_consolePrint("Done.\n");
 
-	_consolePrintf("Configuring... ");
+	_consolePrint("Configuring... ");
 {
 	u8 *p;
 	int size,offset;
 
-	if(!strcpy_safe(ininame,findpath(2,(char*[]){"/",mypath},"ndslink.ini"))){_consolePrintf("As this removes old files, ndslink.ini configuration is required.\n");die();}
+	if(!strcpy_safe(ininame,findpath(6,(char*[]){"/","/_dstwoplug/","/ismartplug/","/_iMenu/_ini/","/_plugin_/",mypath},"ndslink.ini"))){_consolePrint("As this removes old files, ndslink.ini configuration is required.\n");die();}
 	ini_gets("ndslink","source","",source,768,ininame);
 	ini_gets("ndslink","target","",target,768,ininame);
-	if(!*source||!*target){_consolePrintf("As this removes old files, ndslink.ini configuration is required.\n");die();}
+	if(!*source||!*target){_consolePrint("As this removes old files, ndslink.ini configuration is required.\n");die();}
 	if(source[strlen(source)-1]!='/')strcat(source,"/");
 	if(target[strlen(target)-1]!='/')strcat(target,"/");
 	mkpath(target);
 	rm_rf(target);
 	size=getmshl2wrap(&p);
 	if(strcmp((char*)p+0x1e0,"mshl2wrap link"))
-		{puts("template not mshl2wrap link.");die();}
+		{_consolePrint("template not mshl2wrap link.\n");die();}
 	offset=(p[0x1f0]<<24)+(p[0x1f1]<<16)+(p[0x1f2]<<8)+p[0x1f3];
-	if(size<offset+256*3){puts("template too small or offset invalid.");die();}
-	_consolePrintf("Done.\n");
+	if(size<offset+256*3){_consolePrint("template too small or offset invalid.\n");die();}
+	_consolePrint("Done.\n");
 
-	_consolePrintf("Linking...\n");
+	_consolePrint("Linking...\n");
 	recursive(p,offset,size/*,source,target*/);
 }
-	_consolePrintf("Done.\n");die();
+	_consolePrint("Done.\n");die();
 /*
 	// vvvvvvvvvvv add 2008.03.30 kzat3
 #ifdef GPL
 	//if (!strcmp(dldiid,"EZ5H")||!strcmp(dldiid,"EDGE")||!strcmp(dldiid,"SCDS")){
-		_consolePrintf("falling back to Chishm VRAM bootlib.\n");
+		_consolePrint("falling back to Chishm VRAM bootlib.\n");
 		IPCZ->cmd=ResetBootlib;
 		//fifoSendValue32(FIFO_USER_07,2);
 		runNdsFile(ysmenu);
@@ -124,10 +122,10 @@ void Main(){
 	//IPCEX->RESET=RESET;
        //fifoSendValue32(FIFO_USER_07,1);
 	//IPCZ->cmd=ResetRudolph;
-	_consolePrintf("Rebooting... \n");
+	_consolePrint("Rebooting... \n");
 	BootNDSROM(ysmenu);
 	//ret_menu9_GENs();
-	_consolePrintf("Failed.\n");
+	_consolePrint("Failed.\n");
 	die();
 	// ^^^^^^^^^^^^ add 2008.03.30 kzat3
 */

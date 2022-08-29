@@ -9,8 +9,6 @@ const u16 bgcolor=RGB15(0,0,6);
 
 extern int hidehidden;
 
-u8	key_tbl[0x4000]; //lol
-
 //u32 sound_status,vflag,playtime,playtime_v,playtime_flag;
 //u32 need_read,prev_timer;
 
@@ -24,7 +22,7 @@ void startSound(u32 freq, void *top_L, void *top_R, u32 size, u32 format){
 	IPCZ->PCM_size=size;
 	IPCZ->PCM_bits=format;
 	DC_FlushAll();
-	IPCZ->cmd=PlaySound;
+	NotifyARM7(PlaySound);
 	while(IPCZ->cmd)swiWaitForVBlank();
 	
 	//playtime	= 0;
@@ -42,7 +40,7 @@ void startSound(u32 freq, void *top_L, void *top_R, u32 size, u32 format){
 }
 
 void stopSound(){
-	IPCZ->cmd=StopSound;
+	NotifyARM7(StopSound);
 
 	TIMER0_DATA	= 0;
 	TIMER0_CR	= 0;
@@ -53,12 +51,8 @@ void stopSound(){
 }
 
 void swapcartbeforeexec(u8* buf){
-#ifdef _LIBNDS_MAJOR_
-	fatUnmount("fat:/");
-#else
-	fatUnmount(0);
-#endif
-	_consolePrintf(
+	disc_unmount();
+	_consolePrint(
 		"mSD/flashcart unmounted. Please swap flashcart.\n"
 		"Press A to proceed, B to shutdown.\n"
 	);
@@ -71,7 +65,7 @@ void swapcartbeforeexec(u8* buf){
 	}
 	u32 romID = Card_Open(key_tbl);
 	while(romID == 0xFFFFFFFF){
-		_consolePrintf("Cannot be recognized. Insert again.\r");
+		_consolePrintOnce("Cannot be recognized. Insert again.");
 		for(swiWaitForVBlank();;swiWaitForVBlank()){
 			if(!(IPCZ->keysdown))continue;
 			if(IPCZ->keysdown&KEY_A)break;
@@ -79,25 +73,29 @@ void swapcartbeforeexec(u8* buf){
 		}
 		romID = Card_Retry();
 	}
+	_consolePrintOnceEnd();
 	Card_Close();
-	_consolePrintf("done.\n");
+	_consolePrint("done.\n");
 }
 
-char ext[32][EXTMAX]={
-	".nds", //1
-	".c",".cpp",".h",".pl",".py",".rb",".php",".txt",".ini",".log",".cfg",".conf",".htm",".html",".lst", //16
-	".sav",".bak",".duc",".dsv",".gds", //21
-	".dldi",".b15",".ani",".bmp",".ico",".u8m", //27
+char ext[EXTMAX][32]={
+	".nds",
+	".c",".cpp",".cc",".h",".pl",".py",".rb",".php",".txt",".ini",".log",".cfg",".conf",".htm",".html",".xml",".lst",".lua",".gm",
+	".sav",".bak",".duc",".dsv",".gds",".cfs",".ngs",
+	".dldi",".b15",".ani",".bmp",".ico",".u8m",
 };
 
-char *prefs[]={
-	"Use Rudolph Loader to boot",
-	"Use MoonShell Simply Loader to boot",
-	"Use bootlib loader to boot",
-	"Use Rudolph/Moonlight hybrid loader",
-	"Use rpglink to boot",
-	"Use my DLDI to boot",
-	"Disable DLDI patching",
+#define TEXT_START 1
+#define SAV_START  (TEXT_START+19)
+#define DLDI_START (SAV_START+7)
+#define B15_START  (DLDI_START+1)
+#define ANI_START  (B15_START+1)
+#define BMP_START  (ANI_START+1)
+#define U8M_START  (BMP_START+2)
+#define MSP_START  (U8M_START+1)
+
+char *__dummy[]={
+	"foo","bar",
 };
 
 char *context[]={
@@ -114,6 +112,8 @@ char *context[]={
 	"Stat",
 	"Calc hash",
 	"Fix header",
+	"Trim NDS",
+	"Open Patch",
 	"Encrypt secure area",
 	"Decrypt secure area",
 	"Run as homebrew",
@@ -131,13 +131,29 @@ char *systemmenu[]={
 	"Show system info",
 	"Show M3 Region / R4 Jumper",
 	"Swap microSD",
-	"Return to firmware(moonshl2)",
-	"Return to NDS firmware",
-	"Shutdown",
+	"Change DLDI",
 	"Dump Bios/Firmware",
 	"Test microSD speed",
+	"Fix FSInfo sector",
+	"Return to firmware(moonshl2)",
+	"Return to NDS firmware",
+	"Return to BootStub",
+	"Shutdown",
 	"Boot to Slot2 NDS",
 	"Boot to Slot2 GBA",
+};
+
+char *preferences[]={
+	"[Loader] Rudolph Loader",
+	"[Loader] MoonShell Simply Loader",
+	"[Loader] MoonShell2 Loader",
+	"[Loader] bootlib",
+	"[Loader] bootlib+stub",
+	"[Loader] Rudolph/Moonlight hybrid Loader",
+	"[Loader] rpglink",
+	"[DLDI]   Use mine",
+	"[DLDI]   Disable patching",
+	"[DLDI]   Patch null (to kill prepatched)",
 };
 
 enum{
@@ -154,6 +170,8 @@ enum{
 	op_stat,
 	op_hash,
 	op_fixheader,
+	op_trim,
+	op_openpatch,
 	op_encryptsecure,
 	op_decryptsecure,
 	op_hb,
@@ -171,13 +189,29 @@ enum{
 	sys_systeminfo,
 	sys_m3region,
 	sys_swapsd,
-	sys_return,
-	sys_dsmenu,
-	sys_shutdown,
+	sys_changedldi,
 	sys_bios,
 	sys_testsd,
+	sys_fixfsinfo,
+	sys_return,
+	sys_dsmenu,
+	sys_bootstub,
+	sys_shutdown,
 	sys_slot2nds,
 	sys_slot2gba,
+};
+
+enum{
+	pref_rudolphloader=0,
+	pref_mshlsimplyloader,
+	pref_mshl2loader,
+	pref_bootlibloader,
+	pref_bootlibstubloader,
+	pref_rudolphmshlloader,
+	pref_rpglinkloader,
+	pref_mydldi,
+	pref_disabledldi,
+	pref_nulldldi,
 };
 
 type_constpchar BootLibrary;
@@ -187,7 +221,7 @@ int filter;
 void usage(){
 	_consoleClear2();
 #if 0
-	_consolePrintf2(
+	_consolePrint2(
 		"XenoFile - simple and sophisticated filer\n"
 		"Powered by libprism "ROMVERSION"\n"
 		"reset_mse_06b_for_ak2 by Moonlight, Rudolph, kzat3\n"
@@ -202,11 +236,11 @@ void usage(){
 	_consolePrint2("Supported type:\n");
 	int i=0;
 	for(;i<ext_end;i++){
-		if(i)_consolePrintChar2('/');
+		if(i)_consolePrint2("/");
 		_consolePrint2(ext[i]);
 	}
 
-	_consolePrintf2(
+	_consolePrint2(
 		"\n\n"
 		" Cross : Cursor (Left/Right: move 10)\n"
 		"     A : Chdir/Execute/Open by textedit\n"
@@ -225,10 +259,10 @@ void usage(){
 
 void notice(){
 	_consoleClear2();
-	_consolePrintf2(
+	_consolePrint2(
 		"XenoFile - simple and sophisticated filer\n"
 		"*** XenoShell Legacy ***\n"
-		"(C) Taiju Yamada\n"
+		"(C) Ciel de Rive\n"
 #ifdef GPL
 		"under 2-clause BSDL / GNU GPL.\n"
 #else
@@ -241,17 +275,21 @@ void notice(){
 		"reset_mse_06b_for_ak2 by Moonlight, Rudolph, kzat3\n"
 		"MoonShell NDS Loader by Moonlight\n"
 		"VRAM bootlib (external) by Chishm\n"
-		"rpglink (C) Acekard.com and Xenon under MIT license\n"
+		"rpglink (C) Acekard.com and X under MIT license\n"
 		"\n"
 		//"[library]\n"
+#if defined(LIBFAT)
+		"libfat (C) Chishm under BSD License\n"
+#elif defined(LIBELM)
+		"libelm (C) Chan / ywg under BSD License\n"
+#endif
 		"dldipatch aka dlditool public domain under CC0\n"
 		"libmshlsplash under CC0\n"
 		"libcarddump by Rudolph\n"
 		"Secure Encryption by DarkFader\n"
 		"Keyboard Library by HeadSoft\n"
 		"MoonShell Plugin routine by Moonlight\n"
-		"libfat (C) Chishm under BSD License\n"
-		//"minIni (C) ITB CompuPhase under Apache License 2.0\n"
+		//"minIni (C) CompuPhase under Apache License 2.0\n"
 		"zlib (C) Jean-loup Gailly / Mark Adler under zlib/libpng license\n"
 		"libnsbmp (C) Richard Wilson / Sean Fox under MIT license\n"
 		"md5.c (C) RSA Data Security, Inc.\n"
@@ -262,14 +300,14 @@ void notice(){
 /*
 	int i=0;
 	for(;i<ext_end;i++){
-		if(i)_consolePrintChar2('/');
+		if(i)_consolePrint2("/");
 		_consolePrint2(ext[i]);
 	}
 */
-	//_consolePrintChar2('\n');
+	//_consolePrint2("\n");
 	while(IPCZ->keysheld)swiWaitForVBlank();
 	//_consolePrintf2("\n");
-	_consolePrintf2("Press any key.\n");
+	_consolePrint2("Press any key.\n");
 	while(!IPCZ->keysdown)swiWaitForVBlank();
 	usage();
 }
@@ -284,12 +322,16 @@ void Main(){
 	char dldiid[5];
 
 	clipboard[0]=0;
-	IPCZ->cmd=0;
 	_consoleClear();
 	_consolePrint("Waiting for initialization...\n");
 	PrintfToDie=_consolePrintf2;
 
-	_consolePrint2("Initializing XenoFile...\n\n");
+	_consolePrint2(
+		"XenoFile - simple and sophisticated filer\n"
+		"Powered by libprism "ROMVERSION"\n"
+		ROMDATE"\n"
+		ROMENV"\n\n"
+	);
 	{
 		unsigned char *dldiFileData=DLDIDATA;
 		memcpy(dldiid,(char*)dldiFileData+ioType,4);
@@ -298,22 +340,20 @@ void Main(){
 		_consolePrintf2("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
 	}
 
-	_consolePrintf2("Initializing libfat... ");
-	if(!fatInitDefault()){_consolePrintf2("Failed.\n");die();}
-	_consolePrintf2("Done.\n");
+	_consolePrint2("Initializing FAT... ");
+	if(!disc_mount()){_consolePrint2("Failed.\n");die();}
+	_consolePrint2("Done.\n");
 
+#ifdef LIBFAT
 	BootLibrary=bootlibAvailable()?runNdsFile:ret_menu9_Gen;
+#else
+	BootLibrary=(bootlibAvailable()&&bootstubAvailable())?runNdsFileViaStub:ret_menu9_Gen;
+#endif
 
-	ini_gets("mshl2wrap",dldiid,"",loader,256*3,"/MOONSHL2/EXTLINK/mshl2wrap.ini");
-
-	//delay enough
-	IPCZ->arm7bios_addr=key_tbl;
-	IPCZ->arm7bios_bufsize=0x4000;
-	IPCZ->cmd=GetARM7Bios;
-	while(IPCZ->cmd)swiWaitForVBlank();
+	getExtlinkWrapperLoaderName(loader);
 
 	_consolePrint2("Iterating MoonShell plugin...\n");
-	msp_end=iterateMSP(27);
+	msp_end=iterateMSP(MSP_START);
 	_consolePrint2("Iterating MoonShell2 extlink...\n");
 	ext_end=iterateExtLink(msp_end);
 
@@ -329,6 +369,8 @@ void Main(){
 	_consolePrint2("Allocating keyboard...\n");
 	zlib_decompress(keyboard_b15z,keyboard_b15z_size,keyboard_buf,49158);
 	zlib_decompress(keyboard_shift_b15z,keyboard_shift_b15z_size,keyboard_shift_buf,49158);
+
+	extmem_Init();
 
 	//because some libnds doesn't have "struct _user_data" thing. Universal source among devkitARM r23/r31.
 	unsigned char userdata=((u8*)(&PersonalData->calY2px))[1];
@@ -390,6 +432,49 @@ void Main(){
 		swiWaitForVBlank();
 		fileinfo *p=&ftop;
 		{int i=0;for(;i<=cursor;i++)p=p->next;}
+
+		if(key&KEY_B){
+			if(dir[1]==0)continue;
+			dir[strlen(dir)-1]=0;
+			strrchr(dir,'/')[1]=0;
+			getfilelist(dir,filter);
+			cursor=0,oldcursor=0,top=0;
+			continue;
+		}
+		if((key&KEY_L)||(key&KEY_R)){
+			if(key&KEY_L)filter=(filter+1)%3;
+			if(key&KEY_R)filter=(filter-1+3)%3;
+			getfilelist(dir,filter);
+			usage();
+			cursor=0,oldcursor=0,top=0;
+			continue;
+		}
+		if(key&KEY_SELECT){
+			int ret=selectpref("Preferences",arraysize(preferences),preferences);
+			usage();
+			switch(ret){
+				case -1:break;
+				case pref_rudolphloader:BootLibrary=ret_menu9_Gen;_consolePrint2("Use Rudolph Loader.\n");break;
+				case pref_mshlsimplyloader:BootLibrary=BootNDSROM;_consolePrint2("Use MoonShell Simply Loader.\n");break;
+				case pref_mshl2loader:BootLibrary=BootNDSROMex;_consolePrint2("Use MoonShell2 Loader.\n");break;
+				case pref_bootlibloader:BootLibrary=runNdsFile;_consolePrint2("Use bootlib Loader.\n");break;
+				case pref_bootlibstubloader:BootLibrary=runNdsFileViaStub;_consolePrint2("Use bootlib+stub Loader.\n");break;
+				case pref_rudolphmshlloader:BootLibrary=ret_menu9_GenM;_consolePrint2("Use Rudolph/Moonlight hybrid Loader.\n");break;
+				case pref_rpglinkloader:BootLibrary=runRPGLink;_consolePrint2("Use rpglink.\n");break;
+				case pref_mydldi:DLDIToBoot=DLDIDATA;_consolePrint2("Use my DLDI.\n");break;
+				case pref_disabledldi:DLDIToBoot=NULL;_consolePrint2("Disabled DLDI patching.\n");break;
+				case pref_nulldldi:DLDIToBoot=DLDINull;_consolePrint2("Patch with null DLDI.\nPlease note bootlib isn't compatible.\n");break; // It will go to DSi SD in next boot.\n
+			}
+			continue;
+		}
+		if(key&KEY_X){
+			hidehidden^=1;
+			usage();
+			getfilelist(dir,filter);
+			cursor=0,oldcursor=0,top=0;
+			//_consolePrintf2("%s hidden/system file.\n",hidehidden?"Hide":"Show");
+			continue;
+		}
 		if(key&KEY_A){
 			if(p->isDir){
 				if(!strcmp(p->name,"../")){
@@ -416,14 +501,14 @@ void Main(){
 				if(loader[0])runCommercial(file,loader);
 				BootLibrary(file);
 				while(IPCZ->keysheld)swiWaitForVBlank();
-				_consolePrintf("Failed. Press any key.\n");
+				_consolePrint("Failed. Press any key.\n");
 				while(!IPCZ->keysdown)swiWaitForVBlank();
 				usage();
 				getfilelist(dir,filter);
 			break;}
 
 			//handler_Text
-			{int i;for(i=1;i<16;i++)
+			{int i;for(i=TEXT_START;i<SAV_START;i++)
 			if(strlen(p->name)>=strlen(ext[i])&&!strcasecmp(p->name+strlen(p->name)-strlen(ext[i]),ext[i])){
 				strcpy(file,dir);
 				strcat(file,p->name);
@@ -432,14 +517,14 @@ void Main(){
 				_consoleClear();
 				runTextEdit(file);
 				while(IPCZ->keysheld)swiWaitForVBlank();
-				_consolePrintf("Failed. Press any key.\n");
+				_consolePrint("Failed. Press any key.\n");
 				while(!IPCZ->keysdown)swiWaitForVBlank();
 				usage();
 				getfilelist(dir,filter);
 			break;}}
 
 			//handler_SavConvert
-			{int i;for(i=16;i<21;i++)
+			{int i;for(i=SAV_START;i<DLDI_START;i++)
 			if(strlen(p->name)>=strlen(ext[i])&&!strcasecmp(p->name+strlen(p->name)-strlen(ext[i]),ext[i])){
 				strcpy(file,dir);
 				strcat(file,p->name);
@@ -454,14 +539,14 @@ void Main(){
 			break;}}
 
 			// handler_DLDI
-			{int i;for(i=21;i<22;i++)
+			{int i;for(i=DLDI_START;i<B15_START;i++)
 			if(strlen(p->name)>=strlen(ext[i])&&!strcasecmp(p->name+strlen(p->name)-strlen(ext[i]),ext[i])){
 				struct stat st;
 				strcpy(file,dir);
 				strcat(file,p->name);
 				if(stat(file,&st)||st.st_size<128||st.st_size>32768){
 					while(IPCZ->keysheld);
-					_consolePrintf2("DLDI open failed or invalid size. Press any key.\n");
+					_consolePrint2("DLDI open failed or invalid size. Press any key.\n");
 					while(!IPCZ->keysdown);
 					usage();
 					continue;
@@ -474,7 +559,7 @@ void Main(){
 			break;}}
 
 			// handler_B15
-			{int i;for(i=22;i<23;i++)
+			{int i;for(i=B15_START;i<ANI_START;i++)
 			if(strlen(ext[i])&&strlen(p->name)>=strlen(ext[i])&&!strcasecmp(p->name+strlen(p->name)-strlen(ext[i]),ext[i])){
 				strcpy(file,dir);
 				strcat(file,p->name);
@@ -483,7 +568,7 @@ void Main(){
 				FILE *f=fopen(file,"rb");
 				if(!f){
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("cannot open. Press any key.\n");
+					_consolePrint2("cannot open. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();continue;
 				}
@@ -506,25 +591,25 @@ void Main(){
 				}}
 				EnableB15Main();
 				while(IPCZ->keysheld)swiWaitForVBlank();
-				_consolePrintf2("Press any key to end.\n");
+				_consolePrint2("Press any key to end.\n");
 				while(!IPCZ->keysdown)swiWaitForVBlank();
 				DisableB15Main();
 				usage();
 			break;}}
 
 			// handler_ANI
-			{int i;for(i=23;i<24;i++)
+			{int i;for(i=ANI_START;i<BMP_START;i++)
 			if(strlen(ext[i])&&strlen(p->name)>=strlen(ext[i])&&!strcasecmp(p->name+strlen(p->name)-strlen(ext[i]),ext[i])){
 				strcpy(file,dir);
 				strcat(file,p->name);
 				_consolePrintf2("Displaying %s\n",file);
-				_consolePrintf2("A to slideshow, B to end.\n",file);
+				_consolePrint2("A to slideshow, B to end.\n");
 				splash* sp=opensplash(file);
 				if(!sp){
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("invalid file or cannot initialize libmshlsplash. Press any key.\n");
+					_consolePrint2("invalid file or cannot initialize libmshlsplash. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
-					usage();continue;
+					usage();break;
 				}
 				_consolePrintf2("%s splash.\n",
 					sp->version==SPLASH_MOONSHELL1?"MoonShell1":
@@ -536,7 +621,8 @@ void Main(){
 				vramset(b15ptrMain,0xffff,256*192);
 				decompressimage(sp,cursor);
 				vramcpy(b15ptrMain,sp->decompbuf,getimagesize(sp,cursor)/2);
-				_consolePrintf2("Showing %03d / %03d\r",cursor,sp->frame-1);
+				_consoleStartProgress2();
+				_consolePrintProgress2("Showing",cursor,sp->frame-1);
 				EnableB15Main();
 				for(swiWaitForVBlank();;swiWaitForVBlank()){
 					for(;;swiWaitForVBlank()){
@@ -558,7 +644,7 @@ void Main(){
 					if(oldcursor!=cursor){
 						decompressimage(sp,cursor);
 						vramcpy(b15ptrMain,sp->decompbuf,getimagesize(sp,cursor)/2);
-						_consolePrintf2("Showing %03d / %03d\r",cursor,sp->frame-1);
+						_consolePrintProgress2("Showing",cursor,sp->frame-1);
 						oldcursor=cursor;
 					}
 					if(key&0xf0)continue;
@@ -568,30 +654,31 @@ void Main(){
 							decompressimage(sp,cursor);
 							swiWaitForVBlank();
 							vramcpy(b15ptrMain,sp->decompbuf,getimagesize(sp,cursor)/2);
-							_consolePrintf2("Showing %03d / %03d\r",cursor,sp->frame-1);
+							_consolePrintProgress2("Showing",cursor,sp->frame-1);
 						}
 						oldcursor=cursor=sp->frame-1;
 					}
 				}
 				DisableB15Main();
+				_consoleEndProgress2();
 				closesplash(sp);
 				usage();
 			break;}}
 
 			// handler_BMP
-			{int i;for(i=24;i<26;i++)
+			{int i;for(i=BMP_START;i<U8M_START;i++)
 			if(strlen(ext[i])&&strlen(p->name)>=strlen(ext[i])&&!strcasecmp(p->name+strlen(p->name)-strlen(ext[i]),ext[i])){
 				strcpy(file,dir);
 				strcat(file,p->name);
 				_consolePrintf2("Displaying %s\n",file);
 				vramset(b15ptrMain,0xffff,256*192);
-				if(i==24?bmpdecode_show(file):icodecode_show(file)){_consolePrintf2("Decode failed\n");goto bmp_fail;}
+				if(i==BMP_START?bmpdecode_show(file):icodecode_show(file)){_consolePrint2("Decode failed\n");goto bmp_fail;}
 /*
 				u16 z[256];
 				FILE *f=fopen(file,"rb");
 				if(!f){
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("cannot open. Press any key.\n");
+					_consolePrint2("cannot open. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();continue;
 				}
@@ -616,14 +703,14 @@ void Main(){
 				EnableB15Main();
 bmp_fail:
 				while(IPCZ->keysheld)swiWaitForVBlank();
-				_consolePrintf2("Press any key to end.\n");
+				_consolePrint2("Press any key to end.\n");
 				while(!IPCZ->keysdown)swiWaitForVBlank();
 				DisableB15Main();
 				usage();
 			break;}}
 
 			// handler_U8M
-			{int i;for(i=26;i<27;i++)
+			{int i;for(i=U8M_START;i<MSP_START;i++)
 			if(strlen(ext[i])&&strlen(p->name)>=strlen(ext[i])&&!strcasecmp(p->name+strlen(p->name)-strlen(ext[i]),ext[i])){
 				struct stat st;
 				FILE *f;
@@ -633,7 +720,7 @@ bmp_fail:
 				f=fopen(file,"rb");
 				fstat(fileno(f),&st);
 				u8 *p=malloc(st.st_size);
-				if(!p){_consolePrintf2("Cannot alloc\n");goto u8m_fail;}
+				if(!p){_consolePrint2("Cannot alloc\n");goto u8m_fail;}
 				fread(p,1,st.st_size,f);
 				fclose(f);
 				int i=0;for(;i<st.st_size;i++)p[i]-=0x80;
@@ -642,7 +729,7 @@ bmp_fail:
 
 u8m_fail:
 				while(IPCZ->keysheld)swiWaitForVBlank();
-				_consolePrintf2("Press any key to end.\n");
+				_consolePrint2("Press any key to end.\n");
 				while(!IPCZ->keysdown)swiWaitForVBlank();
 				stopSound();
 				free(p);
@@ -650,7 +737,7 @@ u8m_fail:
 			break;}}
 
 			// handler_MSP
-			{int i;for(i=27;i<msp_end;i++)
+			{int i;for(i=MSP_START;i<msp_end;i++)
 			if(strlen(ext[i])&&strlen(p->name)>=strlen(ext[i])&&!strcasecmp(p->name+strlen(p->name)-strlen(ext[i]),ext[i])){
 				strcpy(file,dir);
 				strcat(file,p->name);
@@ -659,24 +746,24 @@ u8m_fail:
 				_consoleClear2();
 
 				FILE *f=fopen(file,"rb");
-				if(!f){_consolePrintf2("cannot open file.\n");goto msp_fail;}
+				if(!f){_consolePrint2("cannot open file.\n");goto msp_fail;}
 				TPluginBody* PB=NULL;
-				PB=getPluginByIndex(i-27);
-				if(!PB){_consolePrintf2("cannot open msp.\n");goto msp_fail;}
+				PB=getPluginByIndex(i-MSP_START);
+				if(!PB){_consolePrint2("cannot open msp.\n");goto msp_fail;}
 
 				if(PB->PluginHeader.PluginType==EPT_Image){
 					_consolePrintf2("Displaying %s\n",file);
 					vramset(b15ptrMain,0xffff,256*192);
-					_consolePrintf2("Opening...\n");
-					if(!PB->pIL->Start((int)f)){_consolePrintf2("cannot open image.\n");goto msp_fail;}
+					_consolePrint2("Opening...\n");
+					if(!PB->pIL->Start((int)f)){_consolePrint2("cannot open image.\n");goto msp_fail;}
 				
 					PB->pIL->RefreshScreen(0,0,b15ptrMain,256,256,192,false);
 					EnableB15Main();
 				}else if(PB->PluginHeader.PluginType==EPT_Sound){
 					_consolePrintf2("Playing %s\n",file);
 					stopSound();
-					_consolePrintf2("Opening...\n");
-					if(!PB->pSL->Start((int)f)){_consolePrintf2("cannot open music.\n");goto msp_fail;}
+					_consolePrint2("Opening...\n");
+					if(!PB->pSL->Start((int)f)){_consolePrint2("cannot open music.\n");goto msp_fail;}
 					u16 sampleperframe=PB->pSL->GetSamplePerFrame();
 					u16 channel=PB->pSL->GetChannelCount();
 					s16 *pL=(s16*)malloc(2*sampleperframe*16);
@@ -685,7 +772,7 @@ u8m_fail:
 					if(!pL||(channel>1&&!pR)){
 						if(pL)free(pL);
 						if(pR)free(pR);
-						_consolePrintf2("cannot alloc buffer.\n");goto msp_fail;
+						_consolePrint2("cannot alloc buffer.\n");goto msp_fail;
 					}
 					int f=0;
 					for(;f<8;f++){
@@ -696,7 +783,7 @@ u8m_fail:
 					IPCZ->blanks=0;
 
 					//while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nPress any key to end.\n");
+					_consolePrint2("\nPress any key to end.\n");
 //_consolePrintf2("%08x\n",sampleperframe);
 					f=0;
 					u16 oldtime=0;
@@ -753,7 +840,7 @@ u8m_fail:
 							oldtime=newtime;
 							DC_FlushAll();
 
-							_consolePrintf2("Playing Time %02d:%02d\r",IPCZ->blanks/3600,IPCZ->blanks/60%60);
+							_consolePrintfOnce2("Playing Time %02d:%02d",IPCZ->blanks/3600,IPCZ->blanks/60%60);
 
 							if(ret<sampleperframe*2){
 								while(TIMER1_DATA-oldtime<ret);
@@ -762,13 +849,14 @@ u8m_fail:
 						}
 					}
 msp_sound_finalize:
+					_consolePrintOnceEnd2();
 					stopSound();
 					free(pL);if(pR)free(pR);
 					goto msp_sound_end;
 				}
 msp_fail:
 				while(IPCZ->keysheld)swiWaitForVBlank();
-				_consolePrintf2("\nPress any key to end.\n");
+				_consolePrint2("\nPress any key to end.\n");
 				while(!IPCZ->keysdown)swiWaitForVBlank();
 
 msp_sound_end:
@@ -791,28 +879,12 @@ msp_sound_end:
 				_consoleClear();
 				runExtLink(file,ext[i]);
 				while(IPCZ->keysheld)swiWaitForVBlank();
-				_consolePrintf("Failed. Press any key.\n");
+				_consolePrint("Failed. Press any key.\n");
 				while(!IPCZ->keysdown)swiWaitForVBlank();
 				usage();
 				getfilelist(dir,filter);
 			}}
 
-			continue;
-		}
-		if(key&KEY_B){
-			if(dir[1]==0)continue;
-			dir[strlen(dir)-1]=0;
-			strrchr(dir,'/')[1]=0;
-			getfilelist(dir,filter);
-			cursor=0,oldcursor=0,top=0;
-			continue;
-		}
-		if((key&KEY_L)||(key&KEY_R)){
-			if(key&KEY_L)filter=(filter+1)%3;
-			if(key&KEY_R)filter=(filter-1+3)%3;
-			getfilelist(dir,filter);
-			usage();
-			cursor=0,oldcursor=0,top=0;
 			continue;
 		}
 		if(key&KEY_START){
@@ -836,13 +908,13 @@ msp_sound_end:
 					ret!=op_mkdir
 				){
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("You cannot do that operation for folder.\n");
+					_consolePrint2("You cannot do that operation for folder.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					continue;
 				}
 				if(!strcmp(p->name,"../")&&(ret==op_cut||ret==op_delete||ret==op_rename||ret==op_timestamp||ret==op_touch||ret==op_attr)){
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("You cannot do that operation for \"..\".\n");
+					_consolePrint2("You cannot do that operation for \"..\".\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					continue;
 				}
@@ -872,11 +944,12 @@ msp_sound_end:
 							break;
 						}
 						_consolePrintf2("%s already exists (%s)\n",file,(stat(clipboard,&st),stto.st_mtime>st.st_mtime)?"NEWER":"older");
-						_consolePrintf2("A to overwrite, other to abort.\n");
+						_consolePrint2("A to overwrite, other to abort.\n");
 						int key;
 						for(;!(key=IPCZ->keysdown);)swiWaitForVBlank();
-						if(!(key&KEY_A)){_consolePrintf2("Aborted.\n");break;}
+						if(!(key&KEY_A)){_consolePrint2("Aborted.\n");break;}
 					}
+					if(!clipboardiscopy)unlink(file);
 					int ret=clipboardiscopy?copy(clipboard,file):rename(clipboard,file);
 					if(clipboardiscopy)libprism_utime(file,st.st_atime,st.st_mtime);
 					while(IPCZ->keysheld)swiWaitForVBlank();
@@ -894,9 +967,9 @@ msp_sound_end:
 						_consolePrintf2("%s is a folder. All files inside will be deleted. If you are sure, press A twice.\n",file);
 						int key;
 						for(;!(key=IPCZ->keysdown);)swiWaitForVBlank();
-						if(!(key&KEY_A)){_consolePrintf2("Aborted.\n");break;}
+						if(!(key&KEY_A)){_consolePrint2("Aborted.\n");break;}
 						for(swiWaitForVBlank();!(key=IPCZ->keysdown);)swiWaitForVBlank();
-						if(!(key&KEY_A)){_consolePrintf2("Aborted.\n");break;}
+						if(!(key&KEY_A)){_consolePrint2("Aborted.\n");break;}
 						strcat(file,"/");
 						rm_rf(file);
 						file[strlen(file)-1]=0;
@@ -904,11 +977,11 @@ msp_sound_end:
 						_consolePrintf2("Press A to confirm to delete %s, other to cancel.\n",file);
 						int key;
 						for(;!(key=IPCZ->keysdown);)swiWaitForVBlank();
-						if(!(key&KEY_A)){_consolePrintf2("Aborted.\n");break;}
+						if(!(key&KEY_A)){_consolePrint2("Aborted.\n");break;}
 					}
 					unlink(file);
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("Deleted. Press any key.\n");
+					_consolePrint2("Deleted. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					getfilelist(dir,filter);
 					usage();
@@ -919,7 +992,7 @@ msp_sound_end:
 					strcpy(to,file);
 					_consoleClear2();
 rename_retry:
-					_consolePrintf2("*** Rename ***\nA or Enter to proceed, B to cancel.\n\n");
+					_consolePrint2("*** Rename ***\nA or Enter to proceed, B to cancel.\n\n");
 					_consolePrintf2("Old:\n%s\nNew:\n%s",file,to);
 
 					vramcpy(b15ptrSub+256*96,keyboard_buf+6,256*96);
@@ -966,7 +1039,7 @@ rename_retry:
 
 					DisableB15Sub();
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nDone. Press any key.\n");
+					_consolePrint2("\nDone. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					getfilelist(dir,filter);
 					usage();
@@ -975,7 +1048,7 @@ rename_retry:
 rename_cancel:
 					DisableB15Sub();
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nCancelled. Press any key.\n");
+					_consolePrint2("\nCancelled. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					continue;
@@ -984,7 +1057,7 @@ rename_cancel:
 					strcpy(getfilename(file),"");
 					_consoleClear2();
 newfile_retry:
-					_consolePrintf2("*** Create new file ***\nA or Enter to proceed, B to cancel.\n\n");
+					_consolePrint2("*** Create new file ***\nA or Enter to proceed, B to cancel.\n\n");
 					_consolePrintf2("%s",file);
 
 					vramcpy(b15ptrSub+256*96,keyboard_buf+6,256*96);
@@ -1033,7 +1106,7 @@ newfile_retry:
 
 					DisableB15Sub();
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nDone. Press any key.\n");
+					_consolePrint2("\nDone. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					getfilelist(dir,filter);
 					usage();
@@ -1042,7 +1115,7 @@ newfile_retry:
 newfile_cancel:
 					DisableB15Sub();
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nCancelled. Press any key.\n");
+					_consolePrint2("\nCancelled. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					continue;
@@ -1051,7 +1124,7 @@ newfile_cancel:
 					strcpy(getfilename(file),"");
 					_consoleClear2();
 mkdir_retry:
-					_consolePrintf2("*** Make directory ***\nA or Enter to proceed, B to cancel.\n\n");
+					_consolePrint2("*** Make directory ***\nA or Enter to proceed, B to cancel.\n\n");
 					_consolePrintf2("%s",file);
 
 					vramcpy(b15ptrSub+256*96,keyboard_buf+6,256*96);
@@ -1098,7 +1171,7 @@ mkdir_retry:
 
 					DisableB15Sub();
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nDone. Press any key.\n");
+					_consolePrint2("\nDone. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					getfilelist(dir,filter);
 					usage();
@@ -1107,14 +1180,14 @@ mkdir_retry:
 mkdir_cancel:
 					DisableB15Sub();
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nCancelled. Press any key.\n");
+					_consolePrint2("\nCancelled. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					continue;
 				}break;
 				case op_timestamp:{
 #ifndef _LIBNDS_MAJOR_
-					_consolePrintf2("Changing timestamp isn't supported on legacy version.\n");goto timestamp_cancel;
+					_consolePrint2("Changing timestamp isn't supported on legacy version.\n");goto timestamp_cancel;
 
 #endif
 					char origstamp[16], timestamp[100];
@@ -1130,7 +1203,7 @@ mkdir_cancel:
 					}
 					_consoleClear2();
 timestamp_retry:
-					_consolePrintf2("*** Change timestamp ***\nA or Enter to proceed, B to cancel.\nFormat is YYYYMMDD hhmmss.\n\n");
+					_consolePrint2("*** Change timestamp ***\nA or Enter to proceed, B to cancel.\nFormat is YYYYMMDD hhmmss.\n\n");
 					_consolePrintf2("Old: %s\nNew: %s",origstamp,timestamp);
 
 					vramcpy(b15ptrSub+256*96,keyboard_buf+6,256*96);
@@ -1183,37 +1256,37 @@ timestamp_retry:
 					}
 					if(validateTM(&t)){
 						_consoleClear2();
-						_consolePrintf2("Inavlid format. Input again.\n\n");
+						_consolePrint2("Invalid format. Input again.\n\n");
 						goto timestamp_retry;
 					}
 					libprism_utime(file,1,mktime(&t));
 
 					DisableB15Sub();
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nDone. Press any key.\n");
+					_consolePrint2("\nDone. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					continue;
 timestamp_cancel:
 					DisableB15Sub();
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nCancelled. Press any key.\n");
+					_consolePrint2("\nCancelled. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					continue;
 				}break;
 				case op_touch:{
 #ifndef _LIBNDS_MAJOR_
-					_consolePrintf2("Changing timestamp isn't supported on legacy version.\n");goto touch_cancel;
+					_consolePrint2("Changing timestamp isn't supported on legacy version.\n");goto touch_cancel;
 
 #endif
 					_consoleClear2();
-					_consolePrintf2("*** Touch file ***\n\n");
+					_consolePrint2("*** Touch file ***\n\n");
 					libprism_touch(file);
 
 					DisableB15Sub();
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nDone. Press any key.\n");
+					_consolePrint2("\nDone. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					continue;
@@ -1221,7 +1294,7 @@ timestamp_cancel:
 touch_cancel:
 					DisableB15Sub();
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nCancelled. Press any key.\n");
+					_consolePrint2("\nCancelled. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					continue;
@@ -1229,11 +1302,16 @@ touch_cancel:
 				}break;
 				case op_attr:{
 #ifndef _LIBNDS_MAJOR_
-					_consolePrintf2("Changing attribute isn't supported on legacy version.\n");goto attr_cancel;
+					_consolePrint2("Changing attribute isn't supported on legacy version.\n");goto attr_cancel;
 
 #endif
 					char attrib[6]="-----";
-					int iattrib=getAttributes(file);
+					int iattrib;
+					{
+						struct stat st;
+						stat(file,&st);
+						iattrib=st.st_spare1;
+					}
 					if(iattrib&ATTRIB_RO)attrib[0]='R';
 					if(iattrib&ATTRIB_HID)attrib[1]='H';
 					if(iattrib&ATTRIB_SYS)attrib[2]='S';
@@ -1242,27 +1320,27 @@ touch_cancel:
 
 attr_again:
 					_consoleClear2();
-					_consolePrintf2("*** Change attribute ***\nA for Yes, B for No.\n\n");
+					_consolePrint2("*** Change attribute ***\nA for Yes, B for No.\n\n");
 					_consolePrintf2("Current attr: %s\n",attrib);
 					u8 newattr=0;
 
-					_consolePrintf2("Set readonly? ");
+					_consolePrint2("Set readonly? ");
 					for(swiWaitForVBlank();;swiWaitForVBlank()){
-						if(IPCZ->keysdown&KEY_A){_consolePrintf2("Yes.\n");newattr|=ATTRIB_RO;break;}
-						if(IPCZ->keysdown&KEY_B){_consolePrintf2("No.\n");break;}
+						if(IPCZ->keysdown&KEY_A){_consolePrint2("Yes.\n");newattr|=ATTRIB_RO;break;}
+						if(IPCZ->keysdown&KEY_B){_consolePrint2("No.\n");break;}
 					}
-					_consolePrintf2("Set hidden? ");
+					_consolePrint2("Set hidden? ");
 					for(swiWaitForVBlank();;swiWaitForVBlank()){
-						if(IPCZ->keysdown&KEY_A){_consolePrintf2("Yes.\n");newattr|=ATTRIB_HID;break;}
-						if(IPCZ->keysdown&KEY_B){_consolePrintf2("No.\n");break;}
+						if(IPCZ->keysdown&KEY_A){_consolePrint2("Yes.\n");newattr|=ATTRIB_HID;break;}
+						if(IPCZ->keysdown&KEY_B){_consolePrint2("No.\n");break;}
 					}
-					_consolePrintf2("Set system? ");
+					_consolePrint2("Set system? ");
 					for(swiWaitForVBlank();;swiWaitForVBlank()){
-						if(IPCZ->keysdown&KEY_A){_consolePrintf2("Yes.\n");newattr|=ATTRIB_SYS;break;}
-						if(IPCZ->keysdown&KEY_B){_consolePrintf2("No.\n");break;}
+						if(IPCZ->keysdown&KEY_A){_consolePrint2("Yes.\n");newattr|=ATTRIB_SYS;break;}
+						if(IPCZ->keysdown&KEY_B){_consolePrint2("No.\n");break;}
 					}
 
-					_consolePrintf2("\n"
+					_consolePrint2("\n"
 						"Press Start to apply.\n"
 						"Press Select to cancel.\n"
 						"Press B to configure again.\n"
@@ -1279,14 +1357,14 @@ attr_apply:
 
 					DisableB15Sub();
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nDone. Press any key.\n");
+					_consolePrint2("\nDone. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					continue;
 attr_cancel:
 					DisableB15Sub();
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nCancelled. Press any key.\n");
+					_consolePrint2("\nCancelled. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					continue;
@@ -1297,8 +1375,8 @@ attr_cancel:
 					struct stat st;
 					stat(file,&st);
 					getsfnlfn(file,sfn,LFN);
-					_FAT_directory_ucs2tombs(lfn,LFN,768);
-					int iattrib=getAttributes(file);
+					ucs2tombs(lfn,LFN);
+					int iattrib=st.st_spare1;//getAttributes(file);
 					if(iattrib&ATTRIB_RO)attrib[0]='R';
 					if(iattrib&ATTRIB_HID)attrib[1]='H';
 					if(iattrib&ATTRIB_SYS)attrib[2]='S';
@@ -1320,11 +1398,11 @@ attr_cancel:
 					strftime(stime, 30, "%Y-%m-%d (%a) %H:%M:%S", localtime(&st.st_ctime));
 					_consolePrintf2("Create:   %s\n",stime);
 
-					_consolePrintf2("\n");
-					_consolePrintf2("Fragment:0 means the file can be accessed sequentially (WoodR4DLDI save OK on clones).\n");
-					_consolePrintf2("Last access time isn't recorded on FAT.\n");
+					_consolePrint2("\n");
+					_consolePrint2("Fragment:0 means the file can be accessed sequentially (WoodR4DLDI save OK on clones).\n");
+					_consolePrint2("Last access time isn't recorded on FAT.\n");
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nPress any key.\n");
+					_consolePrint2("\nPress any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 				}break;
@@ -1336,7 +1414,7 @@ attr_cancel:
 					if(!f||fstat(fileno(f),&st)||!st.st_size){
 						if(f)fclose(f);
 						while(IPCZ->keysheld)swiWaitForVBlank();
-						_consolePrintf2("Cannot open file or filesize==0. Press any key.\n");
+						_consolePrint2("Cannot open file or filesize==0. Press any key.\n");
 						while(!IPCZ->keysdown)swiWaitForVBlank();
 					}else{
 						u32 read,cur=0;
@@ -1345,36 +1423,37 @@ attr_cancel:
 						MD5_CTX ctx;
 						u8 digest[16];
 						MD5Init(&ctx);
-						for(;(read=fread(libprism_buf,1,65536,f))>0;_consolePrintf2("Reading %8d / %8d\r",cur,st.st_size)){
+						_consoleStartProgress2();
+						for(;(read=fread(libprism_buf,1,BUFLEN,f))>0;_consolePrintProgress2("Reading",cur,st.st_size)){
 							_crc16 = swiCRC16(_crc16, libprism_buf, read);
 							_crc32 = crc32(_crc32, libprism_buf, read);
 							_adler32 = adler32(_adler32, libprism_buf, read);
 							MD5Update(&ctx, libprism_buf, read);
 							cur+=read;
 						}
-						_consolePrint2("                              \r");
+						_consoleEndProgress2();
 						fclose(f);
 						MD5Final(digest,&ctx);
 						_consolePrintf2("CRC16:   %04x\n",_crc16);
 						_consolePrintf2("CRC32:   %08x\n",_crc32);
 						_consolePrintf2("Adler32: %08x\n",_adler32);
-						_consolePrintf2("MD5:     ");
+						_consolePrint2("MD5:     ");
 						{int i=0;for(;i<16;i++)_consolePrintf2("%02x",digest[i]);}
-						_consolePrintChar2('\n');
+						_consolePrint2("\n");
 						while(IPCZ->keysheld)swiWaitForVBlank();
-						_consolePrintf2("\nPress any key.\n");
+						_consolePrint2("\nPress any key.\n");
 						while(!IPCZ->keysdown)swiWaitForVBlank();
 					}
 					usage();
 				}break;
 				case op_fixheader:{
 					u8 head[0x160];
-					FILE *f=fopen(file,"rb");
+					FILE *f=fopen(file,"r+b");
 					struct stat st;
 					if(!f||fstat(fileno(f),&st)||st.st_size<0x160){
 						if(f)fclose(f);
 						while(IPCZ->keysheld)swiWaitForVBlank();
-						_consolePrintf2("Cannot open file or filesize too short. Press any key.\n");
+						_consolePrint2("Cannot open file or filesize too short. Press any key.\n");
 						while(!IPCZ->keysdown)swiWaitForVBlank();
 					}else{
 						fread(head,1,0x15c,f);
@@ -1384,22 +1463,85 @@ attr_cancel:
 						fwrite(head+0x15c,1,4,f);
 						fclose(f);
 						while(IPCZ->keysheld)swiWaitForVBlank();
-						_consolePrintf2("Done. Press any key.\n");
+						_consolePrint2("Done. Press any key.\n");
 						while(!IPCZ->keysdown)swiWaitForVBlank();
 					}
 					usage();
 				}break;
+				case op_trim:{
+					u8 buf[0x240];
+#ifdef _LIBNDS_MAJOR_
+					FILE *f=fopen(file,"r+b");
+					struct stat st;
+					_consoleClear2();
+					_consolePrintf2("Trimming %s\n\n",file);
+					if(!f||fstat(fileno(f),&st)||st.st_size<0x1000){
+						if(f)fclose(f);
+						while(IPCZ->keysheld)swiWaitForVBlank();
+						_consolePrint2("Cannot open file or filesize too short. Press any key.\n");
+						while(!IPCZ->keysdown)swiWaitForVBlank();
+					}else{
+						fread(buf,1,0x240,f);
+		//xenondstrim
+		u32 array[16];
+		_consolePrintf2("arm9 end:        %08x\n",array[0]=read32(buf+0x20)+read32(buf+0x2c));
+		_consolePrintf2("arm7 end:        %08x\n",array[1]=read32(buf+0x30)+read32(buf+0x3c));
+		_consolePrintf2("FNT end:         %08x\n",array[2]=read32(buf+0x40)+read32(buf+0x44));
+		_consolePrintf2("FAT end:         %08x\n",array[3]=read32(buf+0x48)+read32(buf+0x4c));
+		_consolePrintf2("arm9overlay end: %08x\n",array[4]=read32(buf+0x50)+read32(buf+0x54));
+		_consolePrintf2("arm7overlay end: %08x\n",array[5]=read32(buf+0x58)+read32(buf+0x5c));
+		_consolePrintf2("icon end:        %08x\n",array[6]=read32(buf+0x68)+2112);
+		_consolePrintf2("NTR size:        %08x\n",array[7]=read32(buf+0x80));
+		_consolePrintf2("arm9i end:       %08x\n",array[8]=read32(buf+0x1c0)+read32(buf+0x1cc));
+		_consolePrintf2("arm7i end:       %08x\n",array[9]=read32(buf+0x1d0)+read32(buf+0x1dc));
+		_consolePrintf2("Digest NTR end:  %08x\n",array[10]=read32(buf+0x1e0)+read32(buf+0x1e4));
+		_consolePrintf2("Digest TWL end:  %08x\n",array[11]=read32(buf+0x1e8)+read32(buf+0x1ec));
+		_consolePrintf2("Digest SecH end: %08x\n",array[12]=read32(buf+0x1f0)+read32(buf+0x1f4));
+		_consolePrintf2("Digest BloH end: %08x\n",array[13]=read32(buf+0x1f8)+read32(buf+0x1fc));
+		_consolePrintf2("Modcrypt1 end:   %08x\n",array[14]=read32(buf+0x220)+read32(buf+0x224));
+		_consolePrintf2("Modcrypt2 end:   %08x\n",array[15]=read32(buf+0x228)+read32(buf+0x22c));
+		u32 s=array[0];
+		int j=1;
+		for(;j<16;j++)if(s<array[j])s=array[j];
+		if(st.st_size>s){
+			_consolePrintf2("Trimmed %08x -> %08x\n",st.st_size,s);
+			ftruncate(fileno(f),s);
+		}else{
+			_consolePrintf2("%08x -> %08x, cannot trim\n",st.st_size,s);
+		}
+						fclose(f);
+#else
+					{
+						_consolePrint2("Trimming feature isn't available in legacy edition.\n");
+#endif
+						while(IPCZ->keysheld)swiWaitForVBlank();
+						_consolePrint2("Press any key.\n");
+						while(!IPCZ->keysdown)swiWaitForVBlank();
+					}
+					usage();
+				}break;
+				case op_openpatch:{
+					_consoleClear2();
+					_consolePrint2("*** OpenPatch ***\n\n");
+					int ret=openpatch_single(file);
+					while(IPCZ->keysheld)swiWaitForVBlank();
+					_consolePrintf2("%s. Press any key.\n",ret?"Failed":"Success");
+					while(!IPCZ->keysdown)swiWaitForVBlank();
+					usage();
+				}break;
 				case op_encryptsecure:{
+					if(GetRunningMode()){_consolePrint2("not supported in DSi mode.\n");continue;}
 					EncryptSecureArea(file);
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("Press any key.\n");
+					_consolePrint2("Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 				}break;
 				case op_decryptsecure:{
+					if(GetRunningMode()){_consolePrint2("not supported in DSi mode.\n");continue;}
 					DecryptSecureArea(file);
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("Press any key.\n");
+					_consolePrint2("Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 				}break;
@@ -1409,12 +1551,13 @@ attr_cancel:
 					_consolePrintf2("Selected %s\n",file);
 					BootLibrary(file);
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf("Failed. Press any key.\n");
+					_consolePrint("Failed. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					getfilelist(dir,filter);
 				}break;
 				case op_hb_swapcart:{
+					if(GetRunningMode()){_consolePrint2("not supported in DSi mode.\n");continue;}
 					destroyfilelist();
 					_consoleClear();
 					_consolePrintf2("Selected %s\n",file);
@@ -1422,7 +1565,7 @@ attr_cancel:
 					ret_menu9_Gen(file);
 					ret_menu9_callback=NULL;
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf("Failed. Press any key.\n");
+					_consolePrint("Failed. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					getfilelist(dir,filter);
@@ -1433,7 +1576,7 @@ attr_cancel:
 					_consolePrintf2("Selected %s\n",file);
 					BootDSBooter(file);
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf("Failed. Press any key.\n");
+					_consolePrint("Failed. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					getfilelist(dir,filter);
@@ -1445,7 +1588,7 @@ attr_cancel:
 					_consolePrintf2("Selected %s\n",file);
 					BootDSBooterRaw(file);
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf("Failed. Press any key.\n");
+					_consolePrint("Failed. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					getfilelist(dir,filter);
@@ -1457,7 +1600,7 @@ attr_cancel:
 					_consolePrintf2("Selected %s\n",file);
 					BootR4Menu(file);
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf("Failed. Press any key.\n");
+					_consolePrint("Failed. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					getfilelist(dir,filter);
@@ -1470,7 +1613,7 @@ attr_cancel:
 					if(!f||fstat(fileno(f),&st)||!st.st_size){
 						if(f)fclose(f);
 						while(IPCZ->keysheld)swiWaitForVBlank();
-						_consolePrintf2("Cannot open file filesize==0. Press any key.\n");
+						_consolePrint2("Cannot open file filesize==0. Press any key.\n");
 						while(!IPCZ->keysdown)swiWaitForVBlank();
 					}else{
 						u8 *p=(u8*)malloc(st.st_size);
@@ -1499,7 +1642,7 @@ attr_cancel:
 					_consolePrintf2("Selected %s\n",file);
 					runTextEdit(file);
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf("Failed. Press any key.\n");
+					_consolePrint("Failed. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					getfilelist(dir,filter);
@@ -1517,11 +1660,11 @@ attr_cancel:
 				case sys_partitioninfo:{
 					_consoleClear2();
 					writePartitionInfo(_consolePrintf2);
-					_consolePrintf2("\n");
-					_consolePrintf2("If FAT32, bytesPerCluster:32768 means that 512MB ROM \"might\" work on this microSD.\n");
-					_consolePrintf2("bytesPerCluster:65536 means that MoonShell2 fast mode doesn't work.\n");
+					_consolePrint2("\n");
+					_consolePrint2("If FAT32, bytesPerCluster:32768 means that 512MB ROM \"might\" work on this microSD.\n");
+					_consolePrint2("bytesPerCluster:65536 means that MoonShell2 fast mode doesn't work.\n");
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nPress any key.\n");
+					_consolePrint2("\nPress any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 				}break;
@@ -1530,8 +1673,8 @@ attr_cancel:
 					char name[40],message[100],stime[30],fwver[20],temper[20];
 					vramcpy(name_utf16,PersonalData->name,PersonalData->nameLen);name_utf16[PersonalData->nameLen]=0;
 					vramcpy(message_utf16,PersonalData->message,PersonalData->messageLen);message_utf16[PersonalData->messageLen]=0;
-					_FAT_directory_ucs2tombs(name,name_utf16,40);
-					_FAT_directory_ucs2tombs(message,message_utf16,100);
+					ucs2tombs(name,name_utf16);
+					ucs2tombs(message,message_utf16);
 
 					char *theme[]={
 						"Gray","Brown","Red","Pink",
@@ -1550,6 +1693,7 @@ attr_cancel:
 					*fwver=0;
 					if(IPCZ->flashmeversion==1)strcpy(fwver,"FlashMe old");
 					if(IPCZ->flashmeversion>1)sprintf(fwver,"FlashMe v%d",IPCZ->flashmeversion+3);
+					if(!IPCZ->fwchksum)strcpy(fwver,"DS(Lite) Preferences");
 					if(!*fwver){
 						int iVer=GetFirmwareVersion();
 						if(!iVer)sprintf(fwver,"Unknown (%04x)",IPCZ->fwchksum);
@@ -1561,9 +1705,14 @@ attr_cancel:
 					sprintf(temper,IPCZ->temperature/0x1000>1000?"Not Available":"%.2f C",(double)IPCZ->temperature/0x1000);
 
 					_consolePrintf2(
-						"I'm:         Nintendo DS%s\n"
+						"DLDI ID:   %s\n"
+						"DLDI Name: %s\n\n",dldiid,DLDIDATA+friendlyName
+					); 
+					_consolePrintf2(
+						"I'm:         Nintendo %s\n"
 						"Firmware:    %s (%d bytes)\n"
-						"Battery:     %s%s\n"
+						"ExtMem:      %s (%d KB)\n"
+						"Battery:     %d%s\n"
 						"MAC Address: %02X:%02X:%02X:%02X:%02X:%02X\n"
 						//"DSLite info: 0x%08x\n"
 						"Time:        %s\n"
@@ -1581,9 +1730,13 @@ attr_cancel:
 						"Brightness:  %d\n"
 						"AutoMode:    %d\n",
 						//"rtcOffset:   0x%08x\n",
-						IPCZ->NDSType==NDSPhat?"":IPCZ->NDSType==NDSLite?" Lite":"i",
+						IPCZ->NDSType==NDSPhat?"DS (Phat)":IPCZ->NDSType==NDSLite?"DS Lite":
+						IPCZ->NDSType==NDSi?(GetRunningMode()==1?"DSi (DSi mode)":"DSi (DS mode)"):
+						IPCZ->NDSType==ThreeDS?(GetRunningMode()==2?"3DS (3DS mode)":GetRunningMode()==1?"3DS (DSi mode)":"3DS (DS mode)"):
+						"New Device",
 						fwver,IPCZ->fwsize,
-						IPCZ->battery&1?"Low":"Good",IPCZ->battery&BIT15?", charging":"",
+						ram_type_string(),ram_size()>>10,
+						IPCZ->battery&0xf,IPCZ->battery&BIT7?", charging":"",
 						IPCZ->MAC[0],IPCZ->MAC[1],IPCZ->MAC[2],IPCZ->MAC[3],IPCZ->MAC[4],IPCZ->MAC[5],
 						//IPCZ->dslite,
 						stime,
@@ -1601,14 +1754,14 @@ attr_cancel:
 						//PersonalData->rtcOffset
 					);
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("\nPress any key.\n");
+					_consolePrint2("\nPress any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 				}break;
 				case sys_m3region:{
 					_consoleClear();
 					_consoleClear2();
-					_consolePrintf("*** Show M3 Region / R4 Jumper ***\n\n");
+					_consolePrint("*** Show M3 Region / R4 Jumper ***\n\n");
 
 					u32 type=R4_ReadCardInfo()&0x3ff;
 					_consolePrintf("Jumper: 0x%03X (%d%d%d-%d%d%d-%d%d%d)\n",type,
@@ -1618,7 +1771,7 @@ attr_cancel:
 						(type>>7)&1,(type>>6)&1,(type>>5)&1,(type>>4)&1,(type>>3)&1,(type>>2)&1,(type>>1)&1,(type>>0)&1);
 					_consolePrint("\n");
 
-					_consolePrintf2(
+					_consolePrint2(
 						"Jumper:  flag1 jumper flag2\n"
 						"[R4/M3S] 1 1 1        1 0 0\n"
 						"[M3Real] 0 1 1        1 0 0\n"
@@ -1648,19 +1801,16 @@ attr_cancel:
 						"[M3i0 G003] 0-1 0 1-0 0-1 1 [53] (?)\n"
 					);
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf("Press any key.\n");
+					_consolePrint("Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 				}break;
 				case sys_swapsd:{
+					if(GetRunningMode()){_consolePrint2("not supported in DSi mode.\n");continue;}
 					destroyfilelist();
 					_consoleClear();
-#ifdef _LIBNDS_MAJOR_
-					fatUnmount("fat:/");
-#else
-					fatUnmount(0);
-#endif
-					_consolePrintf(
+					disc_unmount();
+					_consolePrint(
 						"microSD unmounted. Please swap microSD.\n"
 						"Please note you have to reinsert storage flashcart.\n"
 						"Press A to proceed, B to shutdown.\n"
@@ -1674,8 +1824,8 @@ attr_cancel:
 					}
 					u32 romID = Card_Open(key_tbl);
 					bool fatinited=false;
-					while(romID == 0xFFFFFFFF && !(fatinited=fatInitDefault())){
-						_consolePrintf("Cannot be recognized. Insert again.\r");
+					while(romID == 0xFFFFFFFF && !(fatinited=disc_mount())){
+						_consolePrintOnce("Cannot be recognized. Insert again.");
 						for(swiWaitForVBlank();;swiWaitForVBlank()){
 							if(!(IPCZ->keysdown))continue;
 							if(IPCZ->keysdown&KEY_A)break;
@@ -1684,17 +1834,17 @@ attr_cancel:
 						romID = Card_Retry();
 					}
 					if(romID!=0xFFFFFFFF)Card_Close();
-					_consolePrintf("                                        \r");
-					_consolePrintf("Reinitializing... ");
-					if(!fatinited&&!fatInitDefault()){
-						_consolePrintf(
+					_consolePrintOnceEnd();
+					_consolePrint("Reinitializing... ");
+					if(!fatinited&&!disc_mount()){
+						_consolePrint(
 							"failed.\n"
 							"Some flashcarts cannot initialize DLDI after ejected...\n"
 							"In short swaping microSD doesn't work on this flashcart.\n"
 						);
 						die();
 					}
-					_consolePrintf("done.\n");
+					_consolePrint("done.\n");
 					///
 
 					strcpy(dir,"/");
@@ -1702,6 +1852,25 @@ attr_cancel:
 					usage();
 					cursor=0,oldcursor=0,top=0;
 				}break;
+#if 1
+				case sys_changedldi:{
+					if(DLDIToBoot==DLDIDATA){_consolePrint2("Select Target DLDI first.\n");break;}
+					_consoleClear();
+					destroyfilelist();
+					disc_unmount();
+					_consolePrint("microSD unmounted.\n");
+
+					dldi(DLDIDATA,32*1024);
+					_consolePrint("Reinitializing FAT...\n");
+					if(!disc_mount()){_consolePrint("Failed.\n");die();}
+					_consolePrint("Done.\n");
+					DLDIToBoot=DLDIDATA;
+
+					getfilelist(dir,filter);
+					usage();
+					cursor=0,oldcursor=0,top=0;
+				}break;
+#endif
 				case sys_return:{
 					char *file="/moonshl2/resetmse/zzzz.nds";
 					memcpy(file+19,DLDIDATA+ioType,4);
@@ -1710,7 +1879,7 @@ attr_cancel:
 					_consolePrintf2("Selected %s\n",file);
 					BootLibrary(file);
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf("Failed. Press any key.\n");
+					_consolePrint("Failed. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					getfilelist(dir,filter);
@@ -1719,28 +1888,30 @@ attr_cancel:
 					destroyfilelist();
 					_consoleClear();
 
-					_consolePrintf("*** Return to NDS Firmware ***\n\n");
-					if(IPCZ->NDSType==NDSi){
-						IPCZ->cmd=ReturnDSiMenu;
-					}else{
-						switch(returnDSMenu()){
-							case -1:_consolePrintf2("non GPL version cannot return to DS Menu.\n");break;
-							//case 1:_consolePrintf2("NDSi cannot return to DS Menu.\n");break;
-							//case 2:_consolePrintf2("Firmware isn't 256KB.\n");break;
-							case 3:_consolePrintf2("Cannot alloc memory.\n");break;
-							case 4:_consolePrintf2("Firmware decode error.\n");break;
-						}
+					_consolePrint("*** Return to NDS Firmware ***\n\n");
+					switch(returnDSMenu()){
+						//case -1:_consolePrint2("non GPL version cannot return to DS Menu.\n");break;
+						//case 1:_consolePrint2("NDSi cannot return to DS Menu.\n");break;
+						//case 2:_consolePrint2("Firmware isn't 256KB.\n");break;
+						case 3:_consolePrint2("Cannot alloc memory.\n");break;
+						case 4:_consolePrint2("Firmware decode error.\n");break;
 					}
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("Failed. Press any key.\n");
+					_consolePrint2("Failed. Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					getfilelist(dir,filter);
 				}break;
+				case sys_bootstub:{
+					jumpBootStub();
+					_consolePrint2("It seems that bootstub isn't installed.\n");
+				}break;
 				case sys_shutdown:{
+					disc_unmount();
 					IPCZ->cmd=Shutdown;
 				}break;
 				case sys_bios:{
+					if(GetRunningMode()){_consolePrint2("not supported in DSi mode.\n");continue;}
 					FILE *f;
 					char fwname[20];
 					destroyfilelist();
@@ -1764,46 +1935,77 @@ attr_cancel:
 					IPCZ->firmware_addr=p;
 					IPCZ->firmware_bufsize=IPCZ->fwsize;
 					DC_FlushAll();
-					IPCZ->cmd=GetFirmware;
-					while(IPCZ->cmd)swiWaitForVBlank();
+					CallARM7(GetFirmware);
 					DC_InvalidateAll();
 
 					f=fopen(fwname,"wb");
 					int i=0;
-					for(;i<IPCZ->fwsize;i+=min(65536,IPCZ->fwsize-i),_consolePrintf2("Writing %7d / %7d\r",i,IPCZ->fwsize)){
-						fwrite(p+i,1,min(65536,IPCZ->fwsize-i),f);
+					_consoleStartProgress2();
+					for(;i<IPCZ->fwsize;i+=min(BUFLEN,IPCZ->fwsize-i),_consolePrintProgress2("Writing",i,IPCZ->fwsize)){
+						fwrite(p+i,1,min(BUFLEN,IPCZ->fwsize-i),f);
 					}
+					_consoleEndProgress2();
 					free(p);
 					fclose(f);
 					_consolePrint2("\nDone.\n");
 bios_end:
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("Press any key.\n");
+					_consolePrint2("Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
 					getfilelist(dir,filter);
 				}break;
 				case sys_testsd:{
 					FILE *f;
-					u8 buf[512];
 					u32 n=getSectors()/8;
 					u32 i;
 					double r;
 
+					destroyfilelist();
 					_consoleClear2();
 					_consolePrint2("*** Test microSD speed ***\n\n");
+					u8* buf=(u8*)malloc(1024*1024);
+					if(!buf){
+						_consolePrint2("Cannot alloc memory.\n");goto testsd_end;
+					}
+
 					for(i=0;i<100;i++){
-						sprintf(buf,"/TestSD%02d.txt",i);
-						if(access(buf,0/*2*/))break;
+						sprintf((char*)buf,"/TestSD%02d.txt",i);
+						if(access((char*)buf,0/*2*/))break;
 					}
 					if(i==100){
+						free(buf);
 						_consolePrint2("Cannot create log file.\n");goto testsd_end;
 					}
-					f=fopen(buf,"w");
+					f=fopen((char*)buf,"w");
 					_consolePrintf2("Log file: %s\n\n",buf);
-					fprintf(f,"*** XenoFile Test microSD Log ***\nDLDI ID: %s\n\n",dldiid); 
+					fprintf(f,
+						"*** XenoFile Test microSD Log ***\n"
+						"DLDI ID:   %s\n"
+						"DLDI Name: %s\n\n",dldiid,DLDIDATA+friendlyName
+					); 
 
 					//OK test from here
+/*
+					_consolePrint2("Random 4K: ");
+					IPCZ->blanks=0;
+					for(i=0;i<8;i++){
+						disc_readSectors(i*n,1,buf);
+					}
+					r=IPCZ->blanks*1024/61263.0;
+					_consolePrintf2("%.3fs (%.3fKB/s)\n",r,4/r);
+					fprintf(f,"Random 4K: %.3fs (%.3fKB/s)\n",r,4/r);
+*/
+					_consolePrint2("Random 1M: ");
+					IPCZ->blanks=0;
+					for(i=0;i<1024*2;i++){
+						disc_readSectors((i&7)*n+i/8,1,buf);
+					}
+					r=IPCZ->blanks*1024/61263.0;
+					_consolePrintf2("%.3fs (%.3fKB/s)\n",r,1024/r);
+					fprintf(f,"Random 1M: %.3fs (%.3fKB/s)\n",r,1024/r);
+
+/*
 					_consolePrint2("Sequential 4K: ");
 					IPCZ->blanks=0;
 					for(i=0;i<8;i++){
@@ -1812,6 +2014,7 @@ bios_end:
 					r=IPCZ->blanks*1024/61263.0;
 					_consolePrintf2("%.3fs (%.3fKB/s)\n",r,4/r);
 					fprintf(f,"Sequential 4K: %.3fs (%.3fKB/s)\n",r,4/r);
+*/
 
 					_consolePrint2("Sequential 1M: ");
 					IPCZ->blanks=0;
@@ -1822,34 +2025,50 @@ bios_end:
 					_consolePrintf2("%.3fs (%.3fKB/s)\n",r,1024/r);
 					fprintf(f,"Sequential 1M: %.3fs (%.3fKB/s)\n",r,1024/r);
 
-					_consolePrint2("Random 4K: ");
+					_consolePrint2("MultiBlock 1M: ");
 					IPCZ->blanks=0;
-					for(i=0;i<8;i++){
-						disc_readSectors(i*n,1,buf);
-					}
-					r=IPCZ->blanks*1024/61263.0;
-					_consolePrintf2("%.3fs (%.3fKB/s)\n",r,4/r);
-					fprintf(f,"Random 4K: %.3fs (%.3fKB/s)\n",r,4/r);
-
-					_consolePrint2("Random 1M: ");
-					IPCZ->blanks=0;
-					for(i=0;i<1024*2;i++){
-						disc_readSectors((i&7)*n+i/8,1,buf);
-					}
+					//for(i=0;i<1024*2;i++){
+						disc_readSectors(n*4,2*1024,buf);
+					//}
 					r=IPCZ->blanks*1024/61263.0;
 					_consolePrintf2("%.3fs (%.3fKB/s)\n",r,1024/r);
-					fprintf(f,"Random 1M: %.3fs (%.3fKB/s)\n",r,1024/r);
+					fprintf(f,"MultiBlock 1M: %.3fs (%.3fKB/s)\n",r,1024/r);
+
 					fclose(f);
+					free(buf);
 testsd_end:
 					while(IPCZ->keysheld)swiWaitForVBlank();
-					_consolePrintf2("Press any key.\n");
+					_consolePrint2("Press any key.\n");
 					while(!IPCZ->keysdown)swiWaitForVBlank();
 					usage();
+					getfilelist(dir,filter);
+				}break;
+				case sys_fixfsinfo:{
+#ifdef LIBELM
+					_consolePrint2("not required in libelm.\n");continue;
+#else
+					/////
+#ifndef USE_LIBFAT109
+					_consolePrint2("not required in libfat 1.0.8.\n");continue;
+#else
+					_consoleClear2();
+					_consolePrint2("*** Fix FSInfo Sector ***\n\n");
+					struct statvfs st;
+					memcpy(&st.f_flag,"SCAN",4);
+					statvfs("fat:/",&st);
+					while(IPCZ->keysheld)swiWaitForVBlank();
+					_consolePrint2("Done. Press any key.\n");
+					while(!IPCZ->keysdown)swiWaitForVBlank();
+					usage();
+#endif
+#endif
 				}break;
 				case sys_slot2nds:{
+					if(IPCZ->NDSType>=NDSi){_consolePrint2("not supported in DSi.\n");continue;}
 					slot2nds();
 				}break;
 				case sys_slot2gba:{
+					if(IPCZ->NDSType>=NDSi){_consolePrint2("not supported in DSi.\n");continue;}
 					videoSetMode(MODE_5_2D),videoSetModeSub(MODE_5_2D); //just kill it
 					int screen=(userdata>>3)&1;
 
@@ -1879,29 +2098,6 @@ gbaborder_bmp:
 					slot2gba(screen);
 				}break;
 			}
-			continue;
-		}
-		if(key&KEY_SELECT){
-			int ret=selectpref("Preferences",arraysize(prefs),prefs);
-			usage();
-			switch(ret){
-				case -1:break;
-				case 0:BootLibrary=ret_menu9_Gen;_consolePrintf2("Use Rudolph Loader.\n");break;
-				case 1:BootLibrary=BootNDSROM;_consolePrintf2("Use MoonShell Simply Loader.\n");break;
-				case 2:BootLibrary=runNdsFile;_consolePrintf2("Use bootlib loader.\n");break;
-				case 3:BootLibrary=ret_menu9_GenM;_consolePrintf2("Use Rudolph/Moonlight hybrid loader.\n");break;
-				case 4:BootLibrary=runRPGLink;_consolePrintf2("Use rpglink.\n");break;
-				case 5:DLDIToBoot=DLDIDATA;_consolePrintf2("Use my DLDI.\n");break;
-				case 6:DLDIToBoot=NULL;_consolePrintf2("Disabled DLDI patching.\n");break;
-			}
-			continue;
-		}
-		if(key&KEY_X){
-			hidehidden^=1;
-			usage();
-			getfilelist(dir,filter);
-			cursor=0,oldcursor=0,top=0;
-			//_consolePrintf2("%s hidden/system file.\n",hidehidden?"Hide":"Show");
 			continue;
 		}
 	}

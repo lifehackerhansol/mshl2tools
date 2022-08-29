@@ -1,5 +1,3 @@
-#include <nds/registers_alt.h>
-
 #include "libprism.h"
 
 #if 0
@@ -53,23 +51,16 @@ static inline void _dmaFillWords(const void* src, void* dest, uint32 size) {
 	while(DMA_CR(3) & DMA_BUSY);
 }
 
-static void __attribute__ ((long_call)) resetMemory1_ARM9 (void) 
-{
-	REG_IME = 0;
-	REG_IE = 0;
-	REG_IF = ~0;
-
-#define _REG_WAIT_CR (*(vuint16*)0x04000204)
-	_REG_WAIT_CR|=1 << 7;
+/*
+static void resetMemory1_ARM9(){
+	//REG_EXMEMCNT|=1 << 7;
 
 	//(*(vu32*)0x00803FFC) = 0;   //IRQ_HANDLER ARM9 version
 	//(*(vu32*)0x00803FF8) = ~0;  //VBLANK_INTR_WAIT_FLAGS ARM9 version
 }
+*/
 
-static void __attribute__ ((long_call)) (*lp_resetMemory1_ARM9) (void) =resetMemory1_ARM9;
-
-static void __attribute__ ((long_call)) resetMemory2_ARM9 (void) 
-{
+static void resetMemory2_ARM9(){
  	register int i;
   
 	//clear out ARM9 DMA channels
@@ -82,13 +73,13 @@ static void __attribute__ ((long_call)) resetMemory2_ARM9 (void)
 	}
 
 	VRAM_CR = 0x80808080;
-	(*(vu32*)0x027FFE04) = 0;   // temporary variable
+	(*(vu32*)0x02fFFE04) = 0;   // temporary variable
 	BG_PALETTE[0] = 0xFFFF;
-	_dmaFillWords((void*)0x027FFE04, BG_PALETTE+1, (2*1024)-2);
-	_dmaFillWords((void*)0x027FFE04, OAM,     2*1024);
-	_dmaFillWords((void*)0x027FFE04, (void*)0x04000000, 0x56);  //clear main display registers
-	_dmaFillWords((void*)0x027FFE04, (void*)0x04001000, 0x56);  //clear sub  display registers
-	_dmaFillWords((void*)0x027FFE04, VRAM,  656*1024);
+	_dmaFillWords((void*)0x02fFFE04, BG_PALETTE+1, (2*1024)-2);
+	_dmaFillWords((void*)0x02fFFE04, OAM,     2*1024);
+	_dmaFillWords((void*)0x02fFFE04, (void*)0x04000000, 0x56);  //clear main display registers
+	_dmaFillWords((void*)0x02fFFE04, (void*)0x04001000, 0x56);  //clear sub  display registers
+	_dmaFillWords((void*)0x02fFFE04, VRAM,  656*1024);
 	
 	REG_DISPSTAT=0;
 	videoSetMode(0);
@@ -102,42 +93,49 @@ static void __attribute__ ((long_call)) resetMemory2_ARM9 (void)
 	VRAM_G_CR = 0;
 	VRAM_H_CR = 0;
 	VRAM_I_CR = 0;
-	VRAM_CR   = 0x03000000;
-	POWER_CR  = 0x820F;
+	VRAM_CR   = 0x00000000;
+	REG_POWERCNT = 0x820F;
+	//REG_EXMEMCNT = 0xe880;
 
 	//set shared ram to ARM7
 	WRAM_CR = 0x03;
 }
 
-static void __attribute__ ((long_call)) (*lp_resetMemory2_ARM9) (void) =resetMemory2_ARM9;
-
+//static void __attribute__ ((long_call)) (*lp_resetMemory2_ARM9) (void) =resetMemory2_ARM9;
 
 void bootMoonlight(u32 BootAddress){
-	REG_IME = IME_DISABLE;	// Disable interrupts
-	REG_IF = REG_IF;	// Acknowledge interrupt
-  
-	IPCZ->bootaddress=0;
-	IPCZ->cmd=ResetMoonlight;
+ 	disc_unmount();
   
 	//VRAM_C_CR = VRAM_ENABLE | _VRAM_CD_MAIN_BG_0x6000000;
 	//VRAM_D_CR = VRAM_ENABLE | _VRAM_CD_MAIN_BG_0x6020000;
-
-	DC_FlushAll();
   
-	_consolePrint("resetMemory1_ARM9\n");
-	lp_resetMemory1_ARM9();
+	//_consolePrint("resetMemory1_ARM9\n");
+	//resetMemory1_ARM9();
 	_consolePrint("resetMemory2_ARM9\n");
-	lp_resetMemory2_ARM9();
-  
+	resetMemory2_ARM9();
+
+	//IPCZ->bootaddress=0;
+	IPCZ->bootaddress=BootAddress;
+	NotifyARM7(ResetMoonlight);
+	REG_IME = 0;
+	REG_IE  = 0;
+	REG_IF  = ~0;
+
 	_consolePrintf("Reset to 0x%08x\n",BootAddress);
+	IC_InvalidateAll();
+	DC_FlushAll();
+	DC_InvalidateAll();
   
 	//VRAM_C_CR = VRAM_ENABLE | _VRAM_CD_ARM7_0x6000000;
 	//VRAM_D_CR = VRAM_ENABLE | _VRAM_CD_ARM7_0x6020000;
-	*((vu32*)0x027FFE04) = (u32)0xE59FF018;  // ldr pc, 0x027FFE24
-	*((vu32*)0x027FFE24) = (u32)0x027FFE04;  // Set ARM9 Loop address
-	IPCZ->bootaddress=BootAddress;
+	//*((vu32*)0x02fFFE04) = (u32)0xE59FF018;  // ldr pc, 0x02fFFE24
+	//*((vu32*)0x02fFFE24) = (u32)0x02fFFE04;  // Set ARM9 Loop address
+	*memUncachedAddr(0x02fFFFFC)=0;
+	*memUncachedAddr(0x02fFFE04)=0xE59FF018;
+	*memUncachedAddr(0x02fFFE24)=(u32)memUncachedAddr(0x02fFFE04);
+	//IPCZ->bootaddress=BootAddress;
 	swiSoftReset();  // Reset
-	_consolePrintf("Failed.\n");while(1);
+	_consolePrint("Failed.\n");while(1);
 }
 
 bool BootDSBooter(const char *pFilename){
@@ -161,10 +159,10 @@ bool BootDSBooter(const char *pFilename){
 	if(FileSize==0)
 		{_consolePrintf("Can not open NDS file %s.\n",pFilename);return false;}
 
-	_consolePrintf("MainRam loader X with m3make preparing.\n");
+	_consolePrint("MainRam loader X with m3make preparing.\n");
 
 	//building header...
-	_consolePrintf("Decrypting... ");
+	_consolePrint("Decrypting... ");
 	{
 		int i=0,j;
 		for(;i<0x100;i++){
@@ -173,7 +171,7 @@ bool BootDSBooter(const char *pFilename){
 			if(!memcmp(dec+0xa0,"DSBooter",8))
 				{_consolePrintf("key = 0x%02x\n",i);break;}
 		}
-		if(i==0x100){printf("Cannot decode or not DSBooter\n");return false;}
+		if(i==0x100){_consolePrint("Cannot decode or not DSBooter\n");return false;}
 		for(j=0x000;j<0x200;j++)
 			head[j]=head[j]^i;
 	}
@@ -209,8 +207,8 @@ bool BootDSBooter(const char *pFilename){
 	//fwrite(pFileBuf,1,0x200+l9+pad9+l7+pad7,FileHandle);
 	//fclose(FileHandle);
   
-	_consolePrintf("Rebooting...\n");
-	installargv(pFileBuf,(char*)0x023ff400,pFilename);
+	_consolePrint("Rebooting...\n");
+	installargv(pFileBuf,(char*)0x02fff400,pFilename);
 	bootMoonlight((u32)pFileBuf+0xc0);
 	return true;
 }
@@ -234,10 +232,10 @@ bool BootDSBooterRaw(const char *pFilename){ //Not working...
 	if(FileSize==0)
 		{_consolePrintf("Can not open NDS file %s.\n",pFilename);return false;}
 
-	_consolePrintf("MainRam loader X with m3make preparing.\n");
+	_consolePrint("MainRam loader X with m3make preparing.\n");
 
 	//building header...
-	_consolePrintf("Decrypting... ");
+	_consolePrint("Decrypting... ");
 	{
 		int i=0,j;
 		for(;i<0x100;i++){
@@ -246,13 +244,13 @@ bool BootDSBooterRaw(const char *pFilename){ //Not working...
 			if(!memcmp(dec+0xa0,"DSBooter",8))
 				{_consolePrintf("key = 0x%02x\n",i);break;}
 		}
-		if(i==0x100){printf("Cannot decode or not DSBooter\n");return false;}
+		if(i==0x100){_consolePrint("Cannot decode or not DSBooter\n");return false;}
 		for(j=0x000;j<0x200;j++)
 			head[j]=head[j]^i;
 	}
   
-	_consolePrintf("Rebooting...\n");
-	installargv(pFileBuf,(char*)0x023ff400,pFilename);
+	_consolePrint("Rebooting...\n");
+	installargv(pFileBuf,(char*)0x02fff400,pFilename);
 	bootMoonlight((u32)pFileBuf+0xc0);
 	return true;
 }
@@ -280,7 +278,7 @@ bool BootR4Menu(const char *pFilename){
 	struct stat st;
 	if(stat(pFilename,&st)){_consolePrintf("Can not stat R4Menu %s.\n",pFilename);return false;}
 	//if(st.st_size>0x001ff000){
-	//	_consolePrintf("Filesize too big. Halt.\n");return false;
+	//	_consolePrint("Filesize too big. Halt.\n");return false;
 	//}
 	u32 addr=(u32)getFATEntryAddress(pFilename);
 	if(!addr){_consolePrintf("Error occurred in getting sector of %s.\n",pFilename);return false;}
@@ -314,24 +312,28 @@ bool BootNDSROM2(const char *pFilename,const int bypassYSMenu,const char* dumpna
 	if(FileSize<512)
 		{_consolePrintf("Can not open NDS file %s.\n",pFilename);return false;}
 
-	_consolePrintf("MainRam loader X preparing.\n");
-	_consolePrintf("Trying to load file\n");
+	_consolePrint("MainRam loader X preparing.\n");
+	_consolePrint("Trying to load file\n");
 
 	pFileBuf=(u8*)(0x02000000+2*1024*1024);
 	fread(pFileBuf,1,512,FileHandle);
 	u32 arm7end=read32(pFileBuf+0x30)+read32(pFileBuf+0x3c);
 	if(arm7end>0x001ff000){
-		_consolePrintf("Filesize too big. Falling back to bootlib.\n",pFilename);
+		_consolePrint("Filesize too big. Falling back to bootlib.\n");
 		fclose(FileHandle);
+#ifdef LIBFAT
 		return runNdsFile(pFilename);
+#else
+		return runNdsFileViaStub(pFilename);
+#endif
 	}
 	fread(pFileBuf+512,1,align4(arm7end)-512,FileHandle);
 	fclose(FileHandle);
 
-	_consolePrintf("Applying DLDI...\n");
+	_consolePrint("Applying DLDI...\n");
 	dldi2(pFileBuf,arm7end,bypassYSMenu,dumpname);
-	_consolePrintf("Rebooting...\n");
-	installargv(pFileBuf,(char*)0x023ff400,pFilename);
+	_consolePrint("Rebooting...\n");
+	installargv(pFileBuf,(char*)0x02fff400,pFilename);
 	bootMoonlight((u32)pFileBuf+0xc0);
 	return true;
 }

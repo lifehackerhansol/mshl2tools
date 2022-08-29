@@ -2,7 +2,7 @@ MoonShell2 Tools
 Here are tools for utilize MoonShell2.
 
 ***
-Currently devkitARM r23b/r27/r28/r30/r31 are supported. r20-r23 requires special rename wrapper like
+Currently devkitARM r23b/r27/r28/r30/r31/r32 are supported. r20-r23 requires special rename wrapper like
 void rename(const char *old, const char *new){copy(old,new);unlink(old);}
 ***
 
@@ -592,12 +592,183 @@ Now XenoFile can return to DSi menu when you select "Return to NDS firmware".
 0.70e.101107
 Recompiled as stable...
 
-0.70f.101118
+0.70f.101118 (private)
 XenoFile can "Run as homebrew after swapping flashcart" (half joking... tests didn't work).
 Better dumping firmware (using malloc).
 Can detect Korean Firmware.
 Shows firmware size in system info.
 
-0.70g.101216 Final
+0.70g.101216 (private)
 Now XenoFile can test microSD speed. (half joking)
 Updated libfat and libnds (only in r32 version)
+
+0.71.110106 (private)
+Fixed/Optimized around _consolePrintf. Overall faster.
+
+0.72.110110 Beta (private)
+XenoFile accepts .cc as text. CheatConfig or C++? I don't care.
+You can use WoodM3 from inilink.
+Modified r4loader/ak2loader to use ysmenu config.
+ak2loader is no longer technology preview. Goodbye UiPack.
+Added akysload / akaioysl / akaioms2.
+From this version, AKAIO has to be 1.8.5 or later.
+Homebrew loader of old versions freezes when AKAIO is loaded by mshl2tools.
+
+0.72.110110 (private)
+akaioysl / akaioms2 uses .bin rather than .cc. AKAIO 1.8.5 or later is required.
+And you have to press select in cheat window again to set cheat config back to /__aio/cheat/usrcheat.dat's.
+
+0.72a.110112 (private)
+fixed some configuration bugs.
+
+0.72b.110117 (private)
+Added sav <-> Code Freak Save convertion (You need to rename to .cfs).
+
+0.72c.110122 (private)
+Fixed a serious issue on akaioms2.
+Fixed a bug that r4loader couldn't use cheating.
+Added a small workaround for menudo.
+
+0.72d.110125
+XenoFile:
+* Now SD Test isn't a joke feature.
+* Fixed fatal bug that I forgot xor with 0xffffffff when displaying CRC32.
+* Added Trim NDS.
+
+0.72e.110128
+* Now inilink supports CycloDS (i)Evolution. Great! Sorry for (i)EDGE users as it doesn't have autoboot feature.
+* Removed AKAIO DLDI workaround as AKAIO 1.8.5 DLDI works on YSMenu.
+* XenoFile opens .xml as text.
+
+0.74.110129 alpha1
+Guarded Getting ARM7 bios and Firmware feature in DSi mode, but possibly DSi mode detecton isn't working?
+
+0.74.110130 beta1
+Now checks Running Mode also in legacy version. It seems that legacy nds is working?
+* For DSi mode, use legacy edition. It doesn't use FIFO at all.
+
+0.74.110130 beta2
+Recovered ARGV support in DSi mode.
+
+0.74.110130 beta3
+Improved stability.
+
+0.74.110202 beta5
+Improved stability.
+Now inilink Cyclo requires holding buttons specified in config.xml.
+XenoFile: added bootlib+bootstub loader. You must update bootstub.bin too; otherwise target's exit will restart target ^^
+XenoFile: added Return to bootstub.
+
+0.75.110203 Interrude
+Version bumped to stable. Prelude for mshl2tools 1.x.
+
+0.75a.110203 Interrude
+Fixed a bug that Slot2 wasn't bootable in 0.75.
+Updated to libnds 1.4.10/libfat 1.0.9(modified).
+Added "fix FSInfo Sector" to re-calculate the number of free clusters again.
+Tuned MoonShell Simply loader up for 1.x.
+You can now patch with NULL DLDI to force DSi SD.
+DSi Volume Buttons no longer interrupt execution.
+
+0.75b.110204 Interrude
+Changed killing interrupts timing for 1.x.
+Killed sd:/, as it seems to stuck if not booted from DSiWare.
+
+0.75c.110205 Interrude
+Slight optimization for 1.x.
+Now libfat grubs LFN automatically for 8.3 files and it can handle 0xe5 filename. Yay!
+Updated bootlib loader.
+Now sd:/ is again available. Instead searching drivers will stop if fat:/ is OK.
+Press L+R+START+SELECT to exit the program.
+
+0.75d.110206 Interrude
+Now bootlib uses thumb instead of arm.
+
+0.76.110209 with elm
+Added libelm+ywg's interface.
+Extended fatx.c to support both libfat and libelm.
+
+0.76a.110215 with elm
+Updated libnds to 1.5.0.
+
+0.77.110221 with elm
+ARM7 is now written in thumb.
+Fixed Rudolph/Moonlight hybrid loader.
+Added MoonShell2 Loader (thx to MoonCalc src).
+
+0.77a.110222 with elm
+Added fwrecovery: if you lose firmware settings, you can recover from your fw.bin using this software.
+
+0.77b.110226 with elm
+Capsulized Frontend API.
+Removed m3dscover; nds.m3loader.nds can now be used as loader_m3.nds.
+
+0.77c.110227 with elm
+Some fixes.
+Now ARGV[1] IO is supported.
+
+0.77d.110304 with elm
+SCDS_SetSDHCForDSTT() is called before Main().
+
+0.78.110313 with elm
+Fixed inilink stack overflow.
+Fixed some filename handling in inilink.
+inilink now supports DSTWO fully.
+XenoFile can now convert NO$GBA saves.
+Added nesdswrap.
+
+0.78a.110315 with elm
+Fixed XenoFile msp handling.
+
+0.78b.110316 with elm
+Now nesdswrap is compressed with LZMA.
+
+0.78c.110318 with elm
+L+R+START+SELECT softreset is available also on r23.
+L+R+START+SELECT shutdown/return to DSi menu on nesdswrap.
+
+0.78d.110319 with elm
+Added nesDS 0.44/nesterDS moonlight to nesdswrap.
+inilink supports DSTWO and iSMM.
+
+0.78e.110323 with elm
+Fixed inilink CRLF regression.
+Now XenoFile can access .bin and .ini in loading msp.
+
+0.79.110327
+returnDSMenu() is implemented to libvalkyria rather than XenoFile, which enabled die() extention.
+Now this can be used as RAM unlocker.
+Fixed disc_unmount() timing in some loaders (fixes m3sakura_boot regression).
+Sorry but mshl2tools requires menu.xx trick for M3iZero autoboot from this version, due to large libprism.
+
+0.79a.110403
+11MB of DSi RAM is allocated for extram, rather than 8MB.
+nesdswrap resources are compressed better.
+Added nesDS latest (0.48a) to nesdswrap.
+* From this version, lzma_alone is required for build, rather than LZMA Utils.
+
+0.79b.110424
+Added /_plugin_/ and /_iMenu/_ini/ to search path.
+FavLauncher / ndslink ini can be searched.
+FavLauncher doesn't show nds list if favlauncher.ini isn't found.
+Fixed a fatal bug around die().
+
+0.79c.110425
+XenoFile can do openpatch according to /GameList.txt
+Please note GameList has to be with Game ID (you can generate using GameListV2Builder.zip in XenoBox).
+This is experimental; GameList.txt is in XenoBox package.
+
+0.79d.110508
+Updated nesdswrap.
+Fixed XenoFile openpatch_single.
+
+0.79e.110516
+Updated nesdswrap.
+Now commercial bridges ({ak2,m3,r4}loader) touch sav.
+
+0.79e1.110605
+Updated nesdswrap.
+Fixed some warnings.
+
+0.79f.110606
+Now XenoFile can treat extmem for msp.

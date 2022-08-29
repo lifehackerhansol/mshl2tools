@@ -36,9 +36,12 @@ static inline bool CARD_IsInserted (void)
 	return _io_dldi.fn_isInserted();
 }
 
-static inline bool CARD_ReadSector (u32 sector, void *buffer)
-{
+static inline bool CARD_ReadSector (u32 sector, void *buffer) {
 	return _io_dldi.fn_readSectors(sector, 1, buffer);
 }
-
+/*
+static inline bool CARD_ReadSectors (u32 sector, int count, void *buffer) {
+	return _io_dldi.fn_readSectors(sector, count, buffer);
+}
+*/
 #endif // CARD_H

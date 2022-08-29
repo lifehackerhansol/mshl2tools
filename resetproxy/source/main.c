@@ -32,7 +32,6 @@ void Main(){
 */
 	char *file="/moonshl2/resetmse/zzzz.nds";
 
-	IPCZ->cmd=0;
 	_consolePrintf(
 		"MoonShellExecute reset.mse proxy\n"
 		"reset_mse_06b_for_ak2 by Moonlight, Rudolph, kzat3\n"
@@ -51,13 +50,13 @@ void Main(){
 		_consolePrintf("DLDI Name: %s\n\n",(char*)dldiFileData+friendlyName);
 	}
 
-	//_consolePrintf("Waiting... ");
+	//_consolePrint("Waiting... ");
 	//sleep(1);
-	//_consolePrintf("Done.\n");
+	//_consolePrint("Done.\n");
 
-	_consolePrintf("initializing libfat... ");
-	if(!fatInitDefault()){_consolePrintf("failed.\n");die();}
-	_consolePrintf("done.\n");
+	_consolePrint("initializing FAT... ");
+	if(!disc_mount()){_consolePrint("failed.\n");die();}
+	_consolePrint("done.\n");
 
 	// vvvvvvvvvvv add 2008.03.30 kzat3
 	_consolePrintf("Rebooting to %s...\n",file);
