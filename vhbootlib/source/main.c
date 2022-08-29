@@ -1,8 +1,9 @@
 #include "../../libprism/libprism.h"
 const u16 bgcolor=RGB15(0,0,2);
+const int useARM7Bios=0;
 
 void Main(){
-	FILE *f;
+	//FILE *f;
 	//TExtLinkBody extlink;
 	char target[768];
 	char dldiid[5];
@@ -39,9 +40,11 @@ void Main(){
 		_consolePrint("falling back to Chishm VRAM bootlib.\n");
 		//fifoSendValue32(FIFO_USER_07,2);
 #ifdef LIBFAT
-		return runNdsFile(target);
+		runNdsFile(target);
+		return;
 #else
-		return runNdsFileViaStub(target);
+		runNdsFileViaStub(target);
+		return;
 #endif
 	//}else{
 	//	_consolePrint("allocate done.\n");

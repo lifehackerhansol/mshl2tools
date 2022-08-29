@@ -40,7 +40,8 @@ bool ret_menu9_Gen2(const char *menu_nam,const int bypassYSMenu,const char* dump
 	*memUncachedAddr(0x02fFFDF4)=(u32)ldrBuf;
 	if(ret_menu9_callback)ret_menu9_callback(ldrBuf);
 
-	installargv(ldrBuf,(char*)0x02fff400,menu_nam);
+	if(!argvToInstall)makeargv(menu_nam);
+	installargv(ldrBuf,(char*)0x02fff400);
 	_consolePrint("applying dldi...\n"); //Actually ldrBuf isn't a NDS itself, dldi patching works.
 	dldi2(ldrBuf,siz,bypassYSMenu,dumpname);
 	disc_unmount();

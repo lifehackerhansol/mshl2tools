@@ -10,6 +10,12 @@ cd ../..
 cd akysload/source
 make
 cd ../..
+cd argvloader/source
+make
+cd ../..
+cd argvview/source
+make
+cd ../..
 cd dldicaptor/source
 make
 cd ../..
@@ -67,6 +73,9 @@ cd ../..
 cd r4dump/source
 make
 cd ../..
+cd reset_ievo/source
+make
+cd ../..
 cd reset_m3/source
 make
 cd ../..
@@ -92,6 +101,9 @@ cd ttloader/source
 make
 cd ../..
 cd vhbootlib/source
+make
+cd ../..
+cd wdayloader/source
 make
 cd ../..
 cd woodload/source

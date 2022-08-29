@@ -11,7 +11,7 @@ __attribute__((noreturn)) void _menu7_Gen_s(){
 	u32	*arm7s, *arm7e;
 
 //relocation start
-	bufh = *(vu32**)0x02fFFDF4; //allocated in ret_menu9_Gen()
+	bufh = *(u32**)0x02fFFDF4; //allocated in ret_menu9_Gen()
 
 	adr = (u32*)0x02fFFE00;
 	for(i = 0; i < 512/4; i++) {		// Header
@@ -21,10 +21,10 @@ __attribute__((noreturn)) void _menu7_Gen_s(){
 	}
 
 	buf9 = bufh;
-	buf7 = buf9 + ((*(vu32*)0x02fFFE2C) / 4);
+	buf7 = buf9 + ((*(u32*)0x02fFFE2C) / 4);
 
-	adr = *(vu32**)0x02fFFE38;
-	siz = *(vu32*)0x02fFFE3C;
+	adr = *(u32**)0x02fFFE38;
+	siz = *(u32*)0x02fFFE3C;
 	for(i = 0; i < siz/4; i++) {		// ARM7
 		*adr = *buf7;
 		adr++;
@@ -32,8 +32,8 @@ __attribute__((noreturn)) void _menu7_Gen_s(){
 	}
 	arm7e = adr;
 
-	adr = *(vu32**)0x02fFFE28;
-	siz = *(vu32*)0x02fFFE2C;
+	adr = *(u32**)0x02fFFE28;
+	siz = *(u32*)0x02fFFE2C;
 	if(adr < buf9) {			// ARM9
 		for(i = 0; i < siz/4; i++) {
 			*adr = *buf9;
@@ -55,13 +55,13 @@ __attribute__((noreturn)) void _menu7_Gen_s(){
 
 //clear main memory
 	adr = (u32*)0x02000000;
-	arm9s = *(vu32**)0x02fFFE28;
+	arm9s = *(u32**)0x02fFFE28;
 	while(adr < arm9s) {
 		*adr = 0x00000000;
 		adr++;
 	}
 
-	arm7s = *(vu32**)0x02fFFE38;
+	arm7s = *(u32**)0x02fFFE38;
 
 	//We will stop at 0x023F4000 rather than 0x023FF800
 	if(arm7s > (u32*)0x023F4000)
@@ -80,6 +80,13 @@ __attribute__((noreturn)) void _menu7_Gen_s(){
 
 //jump to "copy address"
 	asm("swi 0x00");			// JUMP 0x02fFFE34
+/*
+	asm(
+		"ldr	r0,=0x2FFFE34\n"
+		"ldr	r0,[r0]\n"
+		"bx	r0\n"
+	);
+*/
 	while(1);
 }
 
@@ -129,7 +136,14 @@ __attribute__((noreturn)) void reboot(){
 	*MoonShellResetFlag=6;
 
 	//*(vu32*)0x02fFFe34 = ARM7ExecAddr;
-	asm("swi 0x00");
+	asm("swi 0x00");			// JUMP 0x02fFFE34
+/*
+	asm(
+		"ldr	r0,=0x2FFFE34\n"
+		"ldr	r0,[r0]\n"
+		"bx	r0\n"
+	);
+*/
 	while(1);
 }
 

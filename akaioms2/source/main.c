@@ -1,5 +1,6 @@
 #include "../../libprism/libprism.h"
 const u16 bgcolor=RGB15(4,0,12);
+const int useARM7Bios=0;
 
 typedef struct{
 	u32 gamecode;
@@ -45,9 +46,9 @@ int writecc(u32 *o, FILE *f){ //from updatecheat --;
 	u32 i=0;
 	for(;i<ocount;){
 		unsigned int foldercount=1;
-		int folderflag=0;
+		//int folderflag=0;
 		if(*o&0x10000000){//folder
-			folderflag=1;
+			//folderflag=1;
 			//fprintf(f,";@@Folder Type: %s\n",(*o&0x01000000)?"one":"multi"); //folder-choice
 			foldercount=*o&0x00ffffff;
 			//fprintf(f,";@@Folder Items: %d\n",foldercount);

@@ -1,5 +1,6 @@
 #include "../../libprism/libprism.h"
 const u16 bgcolor=RGB15(0,15,5);
+const int useARM7Bios=0;
 
 void Main(){
 	_consolePrintf(

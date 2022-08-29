@@ -1,5 +1,6 @@
 #include "../../libprism/libprism.h"
 const u16 bgcolor=RGB15(0,15,5);
+const int useARM7Bios=0;
 
 void Main(){
 	FILE *f;
@@ -40,7 +41,7 @@ void Main(){
 	}
 	_consolePrint("Dumping register...\n");
 	{
-		int i=0,j;
+		//int i=0,j;
 		f=fopen("/REGDUMP.BIN","wb");
 		fwrite((u8*)0x04000000,0x1200,1,f);
 		fclose(f);

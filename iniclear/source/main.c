@@ -1,5 +1,6 @@
 #include "../../libprism/libprism.h"
 const u16 bgcolor=RGB15(10,0,10);
+const int useARM7Bios=0;
 
 void Main(){
 	char ysmenu[768],tmp[768];
@@ -68,7 +69,8 @@ void Main(){
 {
 	char ininame[768],defaultdir[768];
 	int useak2=0,useeos=0/*,useeos2=0*/,usewoodr4=0,usem3=0,useiniclear=0;
-	int dstwo_alpha_accepted=0,r4_alpha_accepted=0,m3sakura_alpha_accepted=0,m3sakura_iniclear_method=0;
+	//int r4_alpha_accepted=0,m3sakura_alpha_accepted=0,
+	int m3sakura_iniclear_method=0;
 	tmp[0]=0;
 
 	ini_gets("Config","YSMenu","/YSMENU/YSMENU.NDS",ysmenu,768,"/moonshl2/extlink/inilink.ini");
@@ -142,9 +144,9 @@ copy:
 	strcpy(ysmenu,tmp);
 notcopy:
 
-	dstwo_alpha_accepted=ini_getl("Config","dstwo_alpha_accepted",0,"/moonshl2/extlink/inilink.ini");
-	r4_alpha_accepted=ini_getl("Config","r4_alpha_accepted",0,"/moonshl2/extlink/inilink.ini");
-	m3sakura_alpha_accepted=ini_getl("Config","m3sakura_alpha_accepted",0,"/moonshl2/extlink/inilink.ini");
+	//dstwo_alpha_accepted=ini_getl("Config","dstwo_alpha_accepted",0,"/moonshl2/extlink/inilink.ini");
+	//r4_alpha_accepted=ini_getl("Config","r4_alpha_accepted",0,"/moonshl2/extlink/inilink.ini");
+	//m3sakura_alpha_accepted=ini_getl("Config","m3sakura_alpha_accepted",0,"/moonshl2/extlink/inilink.ini");
 	m3sakura_iniclear_method=ini_getl("Config","m3sakura_iniclear_method",0,"/moonshl2/extlink/inilink.ini");
 
 	//if(!autoboot){

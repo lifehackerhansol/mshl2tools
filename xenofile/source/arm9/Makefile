@@ -26,7 +26,7 @@ ARCH	:=	-mthumb -mthumb-interwork
 
 # note: arm9tdmi isn't the correct CPU arch, but anything newer and LD
 # *insists* it has a FPU or VFP, and it won't take no for an answer!
-CFLAGS	:=	-Wall -O2 \
+CFLAGS	:=	-Wall -Wno-parentheses -O2 \
 			-march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
 			-ffast-math -fdata-sections \
 			$(ARCH)
